@@ -1,9 +1,13 @@
 all:
-	gcc -Wall fusexmp.c `pkg-config fuse --cflags --libs` -o fusexmp
+	gcc -Wall fusexmp.c fuseecs.c `pkg-config fuse --cflags --libs` -o fuseecs
 
-start:
+create_mountpoint:
 	mkdir -p mountpoint
-	./fusexmp mountpoint
 
+start: create_mountpoint
+	./fuseecs mountpoint
+
+start_foreground: create_mountpoint
+	./fuseecs -f mountpoint
 stop:
 	fusermount -u mountpoint
