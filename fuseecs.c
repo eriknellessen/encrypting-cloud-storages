@@ -38,18 +38,72 @@
 
 #define CONCATENATED_PATH concatenated_path
 #define CHANGE_PATH(FUNCTION_CALL) printf(#FUNCTION_CALL": %s\n", path);\
-char *CONCATENATED_PATH = concat_path(path);\
+enum Access_policy ap = check_access(fuse_get_context());\
+printf("ap: %i\n", ap);\
+if(ap == USER){\
+	char *CONCATENATED_PATH = concat_path(Decrypted_directory, path);\
+	int return_value = FUNCTION_CALL;\
+	free(CONCATENATED_PATH);\
+	return return_value;\
+}\
+char *CONCATENATED_PATH = concat_path(Root_directory, path);\
 int return_value = FUNCTION_CALL;\
 free(CONCATENATED_PATH);\
-return return_value;
+return return_value;\
 
-const char Root_directory[] = "/tmp/decrypted";
+#define ACCESS_USER_ID 1000
+#define ROOT_USER_ID 0
 
-char *concat_path(const char *path){
-	char *concatenated_path = malloc(sizeof(char) * (strlen(Root_directory) + strlen(path) + 1));
-	strcpy(concatenated_path, Root_directory);
+enum Access_policy{DROPBOX, ENCFS, USER};
+
+const char Root_directory[] = "/tmp/encrypted";
+
+const char Decrypted_directory[] = "/tmp/decrypted";
+
+char *concat_path(const char *top_directory, const char *path){
+	char *concatenated_path = malloc(sizeof(char) * (strlen(top_directory) + strlen(path) + 1));
+	strcpy(concatenated_path, top_directory);
 	strcat(concatenated_path, path);
 	return concatenated_path;
+}
+
+enum Access_policy check_access(struct fuse_context *fc){	
+	//Check if it is another user than the permitted one
+	if(fc->uid != ACCESS_USER_ID && fc->uid != ROOT_USER_ID)
+		return DROPBOX;
+	
+	//Check if it is EncFS
+	//Build command to get the command name of the process
+	char pid[10];
+	int bytes_written = snprintf(pid, sizeof(pid), "%d", fc->pid);
+	printf("%s\n", pid);
+	if(bytes_written < 0 || bytes_written > sizeof(pid)){
+		printf("Error when trying to snprintf.\n");
+		exit(1);
+	}
+	char begin_of_ps_cmd[] = "ps -o command ch --pid ";
+	char concatenated_cmd[sizeof(begin_of_ps_cmd) + sizeof(pid)];
+	strcpy(concatenated_cmd, begin_of_ps_cmd);
+	strcat(concatenated_cmd, pid);
+	//Start the command and get the result
+	/* Open the command for reading. */
+	FILE *fp = popen(concatenated_cmd, "r");
+	if (fp == NULL) {
+		printf("Failed to run command\n");
+		exit(1);
+	}
+	/* Read the first 5 signs of the output*/
+	char buf[6];
+	if(fgets(buf, sizeof(buf), fp) != NULL) {
+		pclose(fp);
+		printf("%s\n", buf);
+		printf("%i\n", sizeof(buf) - 1);
+		if(strcmp(buf, "encfs") == 0){
+			return ENCFS;
+		}
+	}
+	//Then it is the user
+	return USER;
 }
 
 static int ecs_getattr(const char *path, struct stat *stbuf)
@@ -80,17 +134,17 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
-	CHANGE_PATH(xmp_mkdir(path, mode))
+	CHANGE_PATH(xmp_mkdir(CONCATENATED_PATH, mode))
 }
 
 static int ecs_unlink(const char *path)
 {
-	CHANGE_PATH(xmp_unlink(path))
+	CHANGE_PATH(xmp_unlink(CONCATENATED_PATH))
 }
 
 static int ecs_rmdir(const char *path)
 {
-	CHANGE_PATH(xmp_rmdir(path))
+	CHANGE_PATH(xmp_rmdir(CONCATENATED_PATH))
 }
 
 //TODO: These three have to be treated in another way than CHANGE_PATH
@@ -111,23 +165,23 @@ static int ecs_link(const char *from, const char *to)
 
 static int ecs_chmod(const char *path, mode_t mode)
 {
-	CHANGE_PATH(xmp_chmod(path, mode))
+	CHANGE_PATH(xmp_chmod(CONCATENATED_PATH, mode))
 }
 
 static int ecs_chown(const char *path, uid_t uid, gid_t gid)
 {
-	CHANGE_PATH(xmp_chown(path, uid, gid))
+	CHANGE_PATH(xmp_chown(CONCATENATED_PATH, uid, gid))
 }
 
 static int ecs_truncate(const char *path, off_t size)
 {
-	CHANGE_PATH(xmp_truncate(path, size))
+	CHANGE_PATH(xmp_truncate(CONCATENATED_PATH, size))
 }
 
 #ifdef HAVE_UTIMENSAT
 static int ecs_utimens(const char *path, const struct timespec ts[2])
 {
-	CHANGE_PATH(xmp_utimens(path, ts))
+	CHANGE_PATH(xmp_utimens(CONCATENATED_PATH, ts))
 }
 #endif
 
@@ -145,30 +199,30 @@ static int ecs_read(const char *path, char *buf, size_t size, off_t offset,
 static int ecs_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
 {
-	CHANGE_PATH(xmp_write(path, buf, size, offset, fi))
+	CHANGE_PATH(xmp_write(CONCATENATED_PATH, buf, size, offset, fi))
 }
 
 static int ecs_statfs(const char *path, struct statvfs *stbuf)
 {
-	CHANGE_PATH(xmp_statfs(path, stbuf))
+	CHANGE_PATH(xmp_statfs(CONCATENATED_PATH, stbuf))
 }
 
 static int ecs_release(const char *path, struct fuse_file_info *fi)
 {
-	CHANGE_PATH(xmp_release(path, fi))
+	CHANGE_PATH(xmp_release(CONCATENATED_PATH, fi))
 }
 
 static int ecs_fsync(const char *path, int isdatasync,
 		     struct fuse_file_info *fi)
 {
-	CHANGE_PATH(xmp_fsync(path, isdatasync, fi))
+	CHANGE_PATH(xmp_fsync(CONCATENATED_PATH, isdatasync, fi))
 }
 
 #ifdef HAVE_POSIX_FALLOCATE
 static int ecs_fallocate(const char *path, int mode,
 			off_t offset, off_t length, struct fuse_file_info *fi)
 {
-	CHANGE_PATH(xmp_fallocate(path, mode, offset, length, fi))
+	CHANGE_PATH(xmp_fallocate(CONCATENATED_PATH, mode, offset, length, fi))
 }
 #endif
 
@@ -177,23 +231,23 @@ static int ecs_fallocate(const char *path, int mode,
 static int ecs_setxattr(const char *path, const char *name, const char *value,
 			size_t size, int flags)
 {
-	CHANGE_PATH(xmp_setxattr(path, name, value, size, flags))
+	CHANGE_PATH(xmp_setxattr(CONCATENATED_PATH, name, value, size, flags))
 }
 
 static int ecs_getxattr(const char *path, const char *name, char *value,
 			size_t size)
 {
-	CHANGE_PATH(xmp_getxattr(path, name, value, size))
+	CHANGE_PATH(xmp_getxattr(CONCATENATED_PATH, name, value, size))
 }
 
 static int ecs_listxattr(const char *path, char *list, size_t size)
 {
-	CHANGE_PATH(xmp_listxattr(path, list, size))
+	CHANGE_PATH(xmp_listxattr(CONCATENATED_PATH, list, size))
 }
 
 static int ecs_removexattr(const char *path, const char *name)
 {
-	CHANGE_PATH(xmp_removexattr(path, name))
+	CHANGE_PATH(xmp_removexattr(CONCATENATED_PATH, name))
 }
 #endif /* HAVE_SETXATTR */
 
