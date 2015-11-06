@@ -80,19 +80,20 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
-	return xmp_mkdir(path, mode);
+	CHANGE_PATH(xmp_mkdir(path, mode))
 }
 
 static int ecs_unlink(const char *path)
 {
-	return xmp_unlink(path);
+	CHANGE_PATH(xmp_unlink(path))
 }
 
 static int ecs_rmdir(const char *path)
 {
-	return xmp_rmdir(path);
+	CHANGE_PATH(xmp_rmdir(path))
 }
 
+//TODO: These three have to be treated in another way than CHANGE_PATH
 static int ecs_symlink(const char *from, const char *to)
 {
 	return xmp_symlink(from, to);
@@ -110,23 +111,23 @@ static int ecs_link(const char *from, const char *to)
 
 static int ecs_chmod(const char *path, mode_t mode)
 {
-	return xmp_chmod(path, mode);
+	CHANGE_PATH(xmp_chmod(path, mode))
 }
 
 static int ecs_chown(const char *path, uid_t uid, gid_t gid)
 {
-	return xmp_chown(path, uid, gid);
+	CHANGE_PATH(xmp_chown(path, uid, gid))
 }
 
 static int ecs_truncate(const char *path, off_t size)
 {
-	return xmp_truncate(path, size);
+	CHANGE_PATH(xmp_truncate(path, size))
 }
 
 #ifdef HAVE_UTIMENSAT
 static int ecs_utimens(const char *path, const struct timespec ts[2])
 {
-	return xmp_utimens(path, ts);
+	CHANGE_PATH(xmp_utimens(path, ts))
 }
 #endif
 
@@ -144,30 +145,30 @@ static int ecs_read(const char *path, char *buf, size_t size, off_t offset,
 static int ecs_write(const char *path, const char *buf, size_t size,
 		     off_t offset, struct fuse_file_info *fi)
 {
-	return xmp_write(path, buf, size, offset, fi);
+	CHANGE_PATH(xmp_write(path, buf, size, offset, fi))
 }
 
 static int ecs_statfs(const char *path, struct statvfs *stbuf)
 {
-	return xmp_statfs(path, stbuf);
+	CHANGE_PATH(xmp_statfs(path, stbuf))
 }
 
 static int ecs_release(const char *path, struct fuse_file_info *fi)
 {
-	return xmp_release(path, fi);
+	CHANGE_PATH(xmp_release(path, fi))
 }
 
 static int ecs_fsync(const char *path, int isdatasync,
 		     struct fuse_file_info *fi)
 {
-	return xmp_fsync(path, isdatasync, fi);
+	CHANGE_PATH(xmp_fsync(path, isdatasync, fi))
 }
 
 #ifdef HAVE_POSIX_FALLOCATE
 static int ecs_fallocate(const char *path, int mode,
 			off_t offset, off_t length, struct fuse_file_info *fi)
 {
-	return xmp_fallocate(path, mode, offset, length, fi);
+	CHANGE_PATH(xmp_fallocate(path, mode, offset, length, fi))
 }
 #endif
 
@@ -176,23 +177,23 @@ static int ecs_fallocate(const char *path, int mode,
 static int ecs_setxattr(const char *path, const char *name, const char *value,
 			size_t size, int flags)
 {
-	return xmp_setxattr(path, name, value, size, flags);
+	CHANGE_PATH(xmp_setxattr(path, name, value, size, flags))
 }
 
 static int ecs_getxattr(const char *path, const char *name, char *value,
 			size_t size)
 {
-	return xmp_getxattr(path, name, value, size);
+	CHANGE_PATH(xmp_getxattr(path, name, value, size))
 }
 
 static int ecs_listxattr(const char *path, char *list, size_t size)
 {
-	return xmp_listxattr(path, list, size);
+	CHANGE_PATH(xmp_listxattr(path, list, size))
 }
 
 static int ecs_removexattr(const char *path, const char *name)
 {
-	return xmp_removexattr(path, name);
+	CHANGE_PATH(xmp_removexattr(path, name))
 }
 #endif /* HAVE_SETXATTR */
 
