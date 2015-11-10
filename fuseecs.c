@@ -53,12 +53,13 @@ return return_value;\
 
 #define ACCESS_USER_ID 1000
 #define ROOT_USER_ID 0
+#define ENCFS_USER_ID 1001
 
 enum Access_policy{DROPBOX, ENCFS, USER};
 
 const char Root_directory[] = "/tmp/encrypted";
 
-const char Decrypted_directory[] = "/tmp/decrypted";
+const char Decrypted_directory[] = "/tmp/decrypted2";
 
 char *concat_path(const char *top_directory, const char *path){
 	char *concatenated_path = malloc(sizeof(char) * (strlen(top_directory) + strlen(path) + 1));
@@ -67,7 +68,15 @@ char *concat_path(const char *top_directory, const char *path){
 	return concatenated_path;
 }
 
-enum Access_policy check_access(struct fuse_context *fc){	
+enum Access_policy check_access(struct fuse_context *fc){
+	switch(fc->uid){
+		case ROOT_USER_ID:
+		case ACCESS_USER_ID: return USER;
+		case ENCFS_USER_ID: return ENCFS;
+		default: return DROPBOX;
+	}
+	
+	/*
 	//Check if it is another user than the permitted one
 	if(fc->uid != ACCESS_USER_ID && fc->uid != ROOT_USER_ID)
 		return DROPBOX;
@@ -86,13 +95,13 @@ enum Access_policy check_access(struct fuse_context *fc){
 	strcpy(concatenated_cmd, begin_of_ps_cmd);
 	strcat(concatenated_cmd, pid);
 	//Start the command and get the result
-	/* Open the command for reading. */
+	// Open the command for reading.
 	FILE *fp = popen(concatenated_cmd, "r");
 	if (fp == NULL) {
 		printf("Failed to run command\n");
 		exit(1);
 	}
-	/* Read the first 5 signs of the output*/
+	// Read the first 5 signs of the output
 	char buf[6];
 	if(fgets(buf, sizeof(buf), fp) != NULL) {
 		pclose(fp);
@@ -104,6 +113,7 @@ enum Access_policy check_access(struct fuse_context *fc){
 	}
 	//Then it is the user
 	return USER;
+	*/
 }
 
 static int ecs_getattr(const char *path, struct stat *stbuf)
