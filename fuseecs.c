@@ -40,16 +40,26 @@
 #define CHANGE_PATH(FUNCTION_CALL) printf(#FUNCTION_CALL": %s\n", path);\
 enum Access_policy ap = check_access(fuse_get_context());\
 printf("ap: %i\n", ap);\
+printf("%s %d\n", __FILE__, __LINE__);\
+struct fuse_context *fc = fuse_get_context();\
+printf("path: %s\n", path);\
+printf("uid: %i\n", fc->uid);\
 if(ap == USER){\
+	printf("%s %d\n", __FILE__, __LINE__);\
 	char *CONCATENATED_PATH = concat_path(Decrypted_directory, path);\
 	int return_value = FUNCTION_CALL;\
+	printf("%s %d\n", __FILE__, __LINE__);\
 	free(CONCATENATED_PATH);\
+	printf("%s %d\n", __FILE__, __LINE__);\
 	return return_value;\
 }\
 char *CONCATENATED_PATH = concat_path(Root_directory, path);\
+printf("%s %d\n", __FILE__, __LINE__);\
 int return_value = FUNCTION_CALL;\
+printf("%s %d\n", __FILE__, __LINE__);\
 free(CONCATENATED_PATH);\
-return return_value;\
+printf("%s %d\n", __FILE__, __LINE__);\
+return return_value;
 
 #define ACCESS_USER_ID 1000
 #define ROOT_USER_ID 0
@@ -59,7 +69,7 @@ enum Access_policy{DROPBOX, ENCFS, USER};
 
 const char Root_directory[] = "/tmp/encrypted";
 
-const char Decrypted_directory[] = "/tmp/decrypted2";
+const char Decrypted_directory[] = "/tmp/decrypted";
 
 char *concat_path(const char *top_directory, const char *path){
 	char *concatenated_path = malloc(sizeof(char) * (strlen(top_directory) + strlen(path) + 1));
@@ -69,14 +79,13 @@ char *concat_path(const char *top_directory, const char *path){
 }
 
 enum Access_policy check_access(struct fuse_context *fc){
-	switch(fc->uid){
+	/*switch(fc->uid){
 		case ROOT_USER_ID:
 		case ACCESS_USER_ID: return USER;
 		case ENCFS_USER_ID: return ENCFS;
 		default: return DROPBOX;
-	}
+	}*/
 	
-	/*
 	//Check if it is another user than the permitted one
 	if(fc->uid != ACCESS_USER_ID && fc->uid != ROOT_USER_ID)
 		return DROPBOX;
@@ -113,7 +122,6 @@ enum Access_policy check_access(struct fuse_context *fc){
 	}
 	//Then it is the user
 	return USER;
-	*/
 }
 
 static int ecs_getattr(const char *path, struct stat *stbuf)

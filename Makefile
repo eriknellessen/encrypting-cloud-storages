@@ -20,4 +20,4 @@ stop:
 	fusermount -u $(MOUNTPOINT)
 	
 start_encfs:
-	encfs -f -o allow_other -v -d $(MOUNTPOINT) $(DECRYPTED_DIRECTORY_ENCFS)
+	echo "password" | encfs -f -o allow_other -v -d -s --stdinpass --standard $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
