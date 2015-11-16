@@ -36,46 +36,102 @@
 #include "fusexmp.h"
 #include <stdlib.h>
 
-#define CONCATENATED_PATH concatenated_path
-#define CHANGE_PATH(FUNCTION_CALL) printf(#FUNCTION_CALL": %s\n", path);\
-enum Access_policy ap = check_access(fuse_get_context());\
-printf("ap: %i\n", ap);\
-printf("%s %d\n", __FILE__, __LINE__);\
-struct fuse_context *fc = fuse_get_context();\
-printf("path: %s\n", path);\
-printf("uid: %i\n", fc->uid);\
-if(ap == USER){\
-	printf("%s %d\n", __FILE__, __LINE__);\
-	char *CONCATENATED_PATH = concat_path(Decrypted_directory, path);\
-	int return_value = FUNCTION_CALL;\
-	printf("%s %d\n", __FILE__, __LINE__);\
-	free(CONCATENATED_PATH);\
-	printf("%s %d\n", __FILE__, __LINE__);\
-	return return_value;\
-}\
-char *CONCATENATED_PATH = concat_path(Root_directory, path);\
-printf("%s %d\n", __FILE__, __LINE__);\
-int return_value = FUNCTION_CALL;\
-printf("%s %d\n", __FILE__, __LINE__);\
-free(CONCATENATED_PATH);\
-printf("%s %d\n", __FILE__, __LINE__);\
-return return_value;
-
 #define ACCESS_USER_ID 1000
 #define ROOT_USER_ID 0
 #define ENCFS_USER_ID 1001
 
+#define ENCFS_CONFIGURATION_FILE ".encfs6.xml"
+
+#define LOCAL_STR_CAT(START, END, RESULT) char RESULT[sizeof(char) * (strlen(START) + strlen(END) + 1)];\
+strcpy(RESULT, START);\
+strcat(RESULT, END);
+
+#define CONCATENATED_PATH concatenated_path
+#define GET_RETURN_VALUE(START_OF_PATH, FUNCTION_CALL) LOCAL_STR_CAT(START_OF_PATH, path, CONCATENATED_PATH)\
+return_value = FUNCTION_CALL;
+#define CHANGE_PATH(FUNCTION_CALL) printf(#FUNCTION_CALL": %s\n", path);\
+enum Access_policy ap = check_access(fuse_get_context());\
+printf("ap: %i\n", ap);\
+printf("path: %s\n", path);\
+printf("uid: %i\n", fuse_get_context()->uid);\
+int return_value;\
+if(ap == USER){\
+	GET_RETURN_VALUE(Decrypted_directory, FUNCTION_CALL)\
+} else { \
+	GET_RETURN_VALUE(Root_directory, FUNCTION_CALL)\
+}\
+return return_value;
+
+#define GET_DECRYPTED_FOLDER_NAME(DIRECTORY) encfsctl decode --extpass="echo password" DIRECTORY
+
 enum Access_policy{DROPBOX, ENCFS, USER};
 
-const char Root_directory[] = "/tmp/encrypted";
+const char Root_directory[] = "/tmp/encrypted/";
 
-const char Decrypted_directory[] = "/tmp/decrypted";
+const char Decrypted_directory[] = "/tmp/decrypted/";
 
-char *concat_path(const char *top_directory, const char *path){
-	char *concatenated_path = malloc(sizeof(char) * (strlen(top_directory) + strlen(path) + 1));
-	strcpy(concatenated_path, top_directory);
-	strcat(concatenated_path, path);
-	return concatenated_path;
+void create_encfs_directory(const char *encrypted_directory){
+	//Create configuration file with the right access rights (so Dropbox can not access it)
+	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_file)
+	LOCAL_STR_CAT("touch ", path_with_file, touch_cmd)
+	if(system(touch_cmd)){
+		fprintf(stderr, "Could not touch encfs configuration file.\n");
+		exit(-1);
+	}
+	LOCAL_STR_CAT("chmod 600 ", path_with_file, chmod_cmd)
+	if(system(chmod_cmd)){
+		fprintf(stderr, "Could not chmod encfs configuration file.\n");
+		exit(-1);
+	}
+	
+	//TODO: If there is an encrypted version of the configuration file, decrypt it.
+}
+
+void start_encfs(const char *encrypted_directory, const char *mount_point){
+	create_encfs_directory(encrypted_directory);
+	
+	LOCAL_STR_CAT("encfs -o allow_other -v -d -s --extpass=\"echo password\" --standard ", encrypted_directory, cmd_with_encrypted_directory)
+	LOCAL_STR_CAT(cmd_with_encrypted_directory, " ", cmd_with_encrypted_directory_and_space)
+	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
+	popen(concatenated_cmd, "r");
+	
+	//TODO: If there is no encrypted version of configuration file, create it.
+}
+
+void start_encfs_for_directory(char *dir){
+	//Start encfs for the correct folder.
+	//Get correct directory name
+	/*
+	 * if(strcmp(dir, Root_directory) == 0){
+	 * 	start_encfs(dir, Decrypted_directory);
+	 * } else {
+	 * 	GET_DECRYPTED_FOLDER_NAME(dir)
+	 * 	start_encfs(dir, decrypted_folder_name);
+	 * }
+	*/
+	struct dirent *m_dirent;
+	
+	DIR *m_dir = opendir(dir);
+	if(m_dir == NULL){
+		fprintf(stderr, "Can't open %s\n", dir);
+		exit(-1);
+	}
+	
+	while((m_dirent = readdir(m_dir)) != NULL){
+		struct stat stbuf;
+		LOCAL_STR_CAT(dir,"/", path)
+		LOCAL_STR_CAT(path, m_dirent->d_name, path_with_file)
+		if(stat(path_with_file, &stbuf) == -1){
+			fprintf(stderr, "Unable to stat file: %s\n",path_with_file) ;
+			exit(-1);
+		}
+
+		if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
+			//Directory
+			//Recursive call
+			start_encfs_for_directory(path_with_file);
+		}
+	}
 }
 
 enum Access_policy check_access(struct fuse_context *fc){
@@ -96,7 +152,7 @@ enum Access_policy check_access(struct fuse_context *fc){
 	int bytes_written = snprintf(pid, sizeof(pid), "%d", fc->pid);
 	printf("%s\n", pid);
 	if(bytes_written < 0 || bytes_written > sizeof(pid)){
-		printf("Error when trying to snprintf.\n");
+		fprintf(stderr, "Error when trying to snprintf.\n");
 		exit(1);
 	}
 	char begin_of_ps_cmd[] = "ps -o command ch --pid ";
@@ -107,7 +163,7 @@ enum Access_policy check_access(struct fuse_context *fc){
 	// Open the command for reading.
 	FILE *fp = popen(concatenated_cmd, "r");
 	if (fp == NULL) {
-		printf("Failed to run command\n");
+		fprintf(stderr, "Failed to run command\n");
 		exit(1);
 	}
 	// Read the first 5 signs of the output
@@ -306,6 +362,7 @@ static struct fuse_operations ecs_oper = {
 
 int main(int argc, char *argv[])
 {
+	start_encfs(Root_directory, Decrypted_directory);
 	umask(0);
 	return fuse_main(argc, argv, &ecs_oper, NULL);
 }
