@@ -35,12 +35,9 @@
 
 #include "fusexmp.h"
 #include <stdlib.h>
+#include <gpgme.h>
 
-#define ACCESS_USER_ID 1000
-#define ROOT_USER_ID 0
-#define ENCFS_USER_ID 1001
-
-#define ENCFS_CONFIGURATION_FILE ".encfs6.xml"
+#include "configuration.h"
 
 #define LOCAL_STR_CAT(START, END, RESULT) char RESULT[sizeof(char) * (strlen(START) + strlen(END) + 1)];\
 strcpy(RESULT, START);\
@@ -56,19 +53,101 @@ printf("path: %s\n", path);\
 printf("uid: %i\n", fuse_get_context()->uid);\
 int return_value;\
 if(ap == USER){\
-	GET_RETURN_VALUE(Decrypted_directory, FUNCTION_CALL)\
+	GET_RETURN_VALUE(DECRYPTED_DIRECTORY, FUNCTION_CALL)\
 } else { \
-	GET_RETURN_VALUE(Root_directory, FUNCTION_CALL)\
+	GET_RETURN_VALUE(ROOT_DIRECTORY, FUNCTION_CALL)\
 }\
 return return_value;
 
 #define GET_DECRYPTED_FOLDER_NAME(DIRECTORY) encfsctl decode --extpass="echo password" DIRECTORY
 
+#define GET_RANDOM_PASSWORD(RESULT) char *get_random_password_data = NULL;\
+{\
+	LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
+	FILE *pipe = popen(cmd, "r");\
+	\
+	char buffer[BUFFER_SIZE];\
+	int size;\
+	int pos = 0;\
+	\
+	if(pipe) {\
+		while(fgets(buffer, BUFFER_SIZE, pipe) != NULL) {\
+			size = strlen(buffer);\
+			get_random_password_data = realloc(get_random_password_data, pos + size);\
+			memcpy(&get_random_password_data[pos], buffer, size);\
+			pos += size;\
+		}\
+	}\
+	\
+	if(pclose(pipe)){\
+		fprintf(stderr, "Could not generate password.\n");\
+		exit(-1);\
+	}\
+	\
+}\
+char RESULT[strlen(get_random_password_data + 1)];\
+strcpy(RESULT, get_random_password_data);\
+free(get_random_password_data);
+
+#define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
+size_t length;\
+{\
+	gpgme_ctx_t gpgme_ctx;\
+	if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){\
+		fprintf(stderr, "Could not create gpg context.\n");\
+		exit(-1);\
+	}\
+	gpgme_data_t gpgme_encrypted_data;\
+	if(gpgme_data_new_from_file(&gpgme_encrypted_data, PATH, 1) != GPG_ERR_NO_ERROR){\
+		fprintf(stderr, "Could not read encrypted data from file %s.\n", PATH);\
+		exit(-1);\
+	}\
+	gpgme_data_t gpgme_decrypted_data;\
+	if(gpgme_data_new(&gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
+		fprintf(stderr, "Could not read encrypted data from file %s.\n", PATH);\
+		exit(-1);\
+	}\
+	if(gpgme_op_decrypt_verify(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
+		fprintf(stderr, "Could not decrypt and verify file %s.\n", PATH);\
+		exit(-1);\
+	}\
+	gpgme_data_release(gpgme_encrypted_data);\
+	gpgme_release(gpgme_ctx);\
+	\
+	plain_text = gpgme_data_release_and_get_mem(gpgme_decrypted_data, &length);\
+}\
+char RESULT[length + 1];\
+if(memcpy(RESULT, plain_text, length) != RESULT){\
+	fprintf(stderr, "Could not copy decrypted data.\n");\
+	exit(-1);\
+}\
+RESULT[length] = 0;\
+gpgme_free(plain_text);
+
 enum Access_policy{DROPBOX, ENCFS, USER};
 
-const char Root_directory[] = "/tmp/encrypted/";
-
-const char Decrypted_directory[] = "/tmp/decrypted/";
+//gpg2 --sign --local-user A6506F46 --encrypt -r A6506F46 --output xxx.txt.gpg xxx.txt
+void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
+	LOCAL_STR_CAT("echo ", data, cmd1)
+	LOCAL_STR_CAT(cmd1, " | ", cmd2)
+	LOCAL_STR_CAT(cmd2, GPG_SIGN_COMMAND, cmd3)
+	LOCAL_STR_CAT(cmd3, OWN_PUBLIC_KEY_FINGERPRINT, cmd4)
+	LOCAL_STR_CAT(cmd4, GPG_ENCRYPTION_OPTION, cmd5)
+	LOCAL_STR_CAT(cmd5, OWN_PUBLIC_KEY_FINGERPRINT, cmd6)
+	LOCAL_STR_CAT(cmd6, GPG_OUTPUT_OPTION, cmd7)
+	LOCAL_STR_CAT(cmd7, file_name, cmd8)
+	LOCAL_STR_CAT(cmd8, ENCRYPTED_FILE_ENDING, cmd9)
+	LOCAL_STR_CAT(cmd9, " ", cmd10)
+	LOCAL_STR_CAT(cmd10, file_name, concatenated_cmd)
+	
+	//Debug
+	printf(concatenated_cmd);
+	
+	if(system(concatenated_cmd)){
+		fprintf(stderr, "Could not sign and encrypt data.\n");
+		exit(-1);
+	}
+}
 
 void create_encfs_directory(const char *encrypted_directory){
 	//Create configuration file with the right access rights (so Dropbox can not access it)
@@ -84,13 +163,28 @@ void create_encfs_directory(const char *encrypted_directory){
 		exit(-1);
 	}
 	
-	//TODO: If there is an encrypted version of the configuration file, decrypt it.
+	//Create random password and encrypt it
+	GET_RANDOM_PASSWORD(password)
+	//TODO: We need to also sign the fingerprint and the path. Otherwise, the storage provider could
+	//put the same password file in all folders.
+	sign_and_encrypt(password, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 }
 
 void start_encfs(const char *encrypted_directory, const char *mount_point){
+	//If the folder has not yet been initiated with encrypted password and so on
+	//(Check signature of password file)
 	create_encfs_directory(encrypted_directory);
 	
-	LOCAL_STR_CAT("encfs -o allow_other -v -d -s --extpass=\"echo password\" --standard ", encrypted_directory, cmd_with_encrypted_directory)
+	//If the folder has already been created
+	//Get decrypted password
+	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_without_file_ending)
+	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)
+	DECRYPT_AND_VERIFY(path_with_file_ending, password)
+	//TODO: If there is an encrypted version of the configuration file, decrypt it.
+	LOCAL_STR_CAT("echo ", password, echo_password_string)
+	LOCAL_STR_CAT(echo_password_string, " | ", echo_password_string_with_pipe)
+	LOCAL_STR_CAT(echo_password_string_with_pipe, ENCFS_COMMAND, cmd_without_encrypted_directory)
+	LOCAL_STR_CAT(cmd_without_encrypted_directory, encrypted_directory, cmd_with_encrypted_directory)
 	LOCAL_STR_CAT(cmd_with_encrypted_directory, " ", cmd_with_encrypted_directory_and_space)
 	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
 	popen(concatenated_cmd, "r");
@@ -102,8 +196,8 @@ void start_encfs_for_directory(char *dir){
 	//Start encfs for the correct folder.
 	//Get correct directory name
 	/*
-	 * if(strcmp(dir, Root_directory) == 0){
-	 * 	start_encfs(dir, Decrypted_directory);
+	 * if(strcmp(dir, ROOT_DIRECTORY) == 0){
+	 * 	start_encfs(dir, DECRYPTED_DIRECTORY);
 	 * } else {
 	 * 	GET_DECRYPTED_FOLDER_NAME(dir)
 	 * 	start_encfs(dir, decrypted_folder_name);
@@ -362,7 +456,7 @@ static struct fuse_operations ecs_oper = {
 
 int main(int argc, char *argv[])
 {
-	start_encfs(Root_directory, Decrypted_directory);
+	start_encfs(ROOT_DIRECTORY, DECRYPTED_DIRECTORY);
 	umask(0);
 	return fuse_main(argc, argv, &ecs_oper, NULL);
 }
