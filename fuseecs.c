@@ -85,10 +85,12 @@ return return_value;
 	}\
 	\
 }\
-char RESULT[strlen(get_random_password_data + 1)];\
-strcpy(RESULT, get_random_password_data);\
+char RESULT[strlen(get_random_password_data)];\
+memcpy(RESULT, get_random_password_data, strlen(get_random_password_data));\
+RESULT[strlen(get_random_password_data) - 1] = 0;\
 free(get_random_password_data);
 
+//TODO: Check, if the signature has been made with the expected key.
 #define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
 size_t length;\
 {\
@@ -116,12 +118,12 @@ size_t length;\
 	\
 	plain_text = gpgme_data_release_and_get_mem(gpgme_decrypted_data, &length);\
 }\
-char RESULT[length + 1];\
+char RESULT[length];\
 if(memcpy(RESULT, plain_text, length) != RESULT){\
 	fprintf(stderr, "Could not copy decrypted data.\n");\
 	exit(-1);\
 }\
-RESULT[length] = 0;\
+RESULT[length - 1] = 0;\
 gpgme_free(plain_text);
 
 enum Access_policy{DROPBOX, ENCFS, USER};
@@ -135,13 +137,12 @@ void sign_and_encrypt(const char *data, const char *public_key_fingerprint, cons
 	LOCAL_STR_CAT(cmd4, GPG_ENCRYPTION_OPTION, cmd5)
 	LOCAL_STR_CAT(cmd5, OWN_PUBLIC_KEY_FINGERPRINT, cmd6)
 	LOCAL_STR_CAT(cmd6, GPG_OUTPUT_OPTION, cmd7)
-	LOCAL_STR_CAT(cmd7, file_name, cmd8)
-	LOCAL_STR_CAT(cmd8, ENCRYPTED_FILE_ENDING, cmd9)
-	LOCAL_STR_CAT(cmd9, " ", cmd10)
-	LOCAL_STR_CAT(cmd10, file_name, concatenated_cmd)
+	LOCAL_STR_CAT(cmd7, path, cmd8)
+	LOCAL_STR_CAT(cmd8, file_name, cmd9)
+	LOCAL_STR_CAT(cmd9, ENCRYPTED_FILE_ENDING, concatenated_cmd)
 	
 	//Debug
-	printf(concatenated_cmd);
+	printf("concatenated_cmd: %s\n", concatenated_cmd);
 	
 	if(system(concatenated_cmd)){
 		fprintf(stderr, "Could not sign and encrypt data.\n");
@@ -165,6 +166,7 @@ void create_encfs_directory(const char *encrypted_directory){
 	
 	//Create random password and encrypt it
 	GET_RANDOM_PASSWORD(password)
+	printf("password before encryption: %s\n", password);
 	//TODO: We need to also sign the fingerprint and the path. Otherwise, the storage provider could
 	//put the same password file in all folders.
 	sign_and_encrypt(password, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
@@ -180,6 +182,7 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_without_file_ending)
 	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)
 	DECRYPT_AND_VERIFY(path_with_file_ending, password)
+	printf("password after decryption: %s\n", password);
 	//TODO: If there is an encrypted version of the configuration file, decrypt it.
 	LOCAL_STR_CAT("echo ", password, echo_password_string)
 	LOCAL_STR_CAT(echo_password_string, " | ", echo_password_string_with_pipe)
@@ -187,6 +190,7 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 	LOCAL_STR_CAT(cmd_without_encrypted_directory, encrypted_directory, cmd_with_encrypted_directory)
 	LOCAL_STR_CAT(cmd_with_encrypted_directory, " ", cmd_with_encrypted_directory_and_space)
 	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
+	printf("before popen.\n");
 	popen(concatenated_cmd, "r");
 	
 	//TODO: If there is no encrypted version of configuration file, create it.
@@ -456,6 +460,7 @@ static struct fuse_operations ecs_oper = {
 
 int main(int argc, char *argv[])
 {
+	gpgme_check_version(NULL);
 	start_encfs(ROOT_DIRECTORY, DECRYPTED_DIRECTORY);
 	umask(0);
 	return fuse_main(argc, argv, &ecs_oper, NULL);
