@@ -126,13 +126,13 @@ if(memcpy(RESULT, plain_text, length) != RESULT){\
 RESULT[length - 1] = 0;\
 gpgme_free(plain_text);
 
-#define DECRYPT_PASSWORD_AN_VERIFY_PATH(PATH, RESULT) size_t password_length;\
+#define DECRYPT_DATA_AND_VERIFY_PATH(PATH, FILE_NAME, RESULT) size_t password_length;\
 size_t end_of_path;\
-LOCAL_STR_CAT(PATH, PASSWORD_FILE_NAME, path_without_file_ending)\
+LOCAL_STR_CAT(PATH, FILE_NAME, path_without_file_ending)\
 LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
 DECRYPT_AND_VERIFY(path_with_file_ending, path_and_password)\
 {\
-char *end_of_path_string = strchr(path_and_password, PATH_AND_PASSWORD_SEPARATOR);\
+char *end_of_path_string = strchr(path_and_password, PATH_SEPARATOR);\
 end_of_path = end_of_path_string - path_and_password;\
 char path[end_of_path + 1];\
 strncpy(path, path_and_password, end_of_path);\
@@ -146,11 +146,51 @@ password_length = strlen(path_and_password - (end_of_path + 1));\
 char RESULT[password_length + 1];\
 strcpy(RESULT, path_and_password + end_of_path + 1);
 
+#define READ_FILE(PATH, RESULT) FILE *f = fopen(PATH, "r");\
+if(f == NULL){\
+	fprintf(stderr, "Could not read file %s.\n", PATH);\
+	exit(-1);\
+}\
+fseek(f, 0, SEEK_END);\
+long pos = ftell(f);\
+fseek(f, 0, SEEK_SET);\
+char RESULT[pos + 1];\
+fread(RESULT, pos, 1, f);\
+RESULT[pos] = 0;\
+fclose(f);
+
+#define WRITE_FILE(PATH, DATA) {\
+FILE *f = fopen(PATH, "w");\
+if(f == NULL){\
+	fprintf(stderr, "Could not read file %s (when trying to write to it).\n", PATH);\
+	exit(-1);\
+}\
+fputs(DATA, f);\
+fclose(f);\
+}
+
+#define SEPARATE_STRINGS(FIRST, SECOND, RESULT) char separator_string[] = PATH_SEPARATOR_STRING;\
+LOCAL_STR_CAT(FIRST, separator_string, first_string_with_separator)\
+LOCAL_STR_CAT(first_string_with_separator, SECOND, RESULT)
+
 enum Access_policy{DROPBOX, ENCFS, USER};
+
+long get_file_size(char *path){
+	FILE *f = fopen(path, "r");
+	if(f == NULL){
+		fprintf(stderr, "Could not read file %s (when trying to get size).\n", path);
+		exit(-1);
+	}
+	fseek(f, 0, SEEK_END);
+	long return_value = ftell(f);
+	fclose(f);
+	return return_value;
+}
 
 //gpg2 --sign --local-user A6506F46 --encrypt -r A6506F46 --output xxx.txt.gpg xxx.txt
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
-	LOCAL_STR_CAT("echo ", data, cmd1)
+	LOCAL_STR_CAT("echo \'", data, cmd0)
+	LOCAL_STR_CAT(cmd0, "\'", cmd1)
 	LOCAL_STR_CAT(cmd1, " | ", cmd2)
 	LOCAL_STR_CAT(cmd2, GPG_SIGN_COMMAND, cmd3)
 	LOCAL_STR_CAT(cmd3, OWN_PUBLIC_KEY_FINGERPRINT, cmd4)
@@ -192,25 +232,37 @@ void create_encfs_directory(const char *encrypted_directory){
 	/*
 	 * Format: "/path/to/folder/encrypted/with/the/password\npassword"
 	 */
-	char separator_string[] = PATH_AND_PASSWORD_SEPARATOR_STRING;
-	LOCAL_STR_CAT(encrypted_directory, separator_string, encrypted_directory_with_linebreak)
-	LOCAL_STR_CAT(encrypted_directory_with_linebreak, password, plain_text)
+	SEPARATE_STRINGS(encrypted_directory, password, plain_text)
 	sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 }
 
 void start_encfs(const char *encrypted_directory, const char *mount_point){
 	//If the folder has not yet been initiated with encrypted password and so on, initiate it
-	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_file)
-	LOCAL_STR_CAT(path_with_file, ENCRYPTED_FILE_ENDING, encrypted_password_file)
+	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
+	LOCAL_STR_CAT(path_with_password_file, ENCRYPTED_FILE_ENDING, encrypted_password_file)
 	if(access(encrypted_password_file, F_OK) == -1){
 		create_encfs_directory(encrypted_directory);
 	}
 	
-	//If the folder has already been created
+	//Folder has been created
+	
+	//If there is an encrypted version of the configuration file, decrypt it.
+	//Decrypt data, check signature, check path
+	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_encfs_file)
+	LOCAL_STR_CAT(path_with_encfs_file, ENCRYPTED_FILE_ENDING, encrypted_encfs_file)
+	if(access(encrypted_encfs_file, F_OK) == 0){
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, ENCFS_CONFIGURATION_FILE, encfs_configuration_data)
+		printf("encfs configuration data after decryption: %s\n", encfs_configuration_data);
+		//Write data to file
+		WRITE_FILE(path_with_encfs_file, encfs_configuration_data)
+	}
+	
 	//Get decrypted password
-	DECRYPT_PASSWORD_AN_VERIFY_PATH(encrypted_directory, password)
+	DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, PASSWORD_FILE_NAME, password)
 	printf("password after decryption: %s\n", password);
-	//TODO: If there is an encrypted version of the configuration file, decrypt it.
+	
+	//Start encfs process
+	//TODO: Giving the password in that form is not a good idea, as it is visible for everyone who can view processes via ps
 	LOCAL_STR_CAT("echo ", password, echo_password_string)
 	LOCAL_STR_CAT(echo_password_string, " | ", echo_password_string_with_pipe)
 	LOCAL_STR_CAT(echo_password_string_with_pipe, ENCFS_COMMAND, cmd_without_encrypted_directory)
@@ -220,7 +272,19 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 	printf("before popen.\n");
 	popen(concatenated_cmd, "r");
 	
-	//TODO: If there is no encrypted version of configuration file, create it.
+	//If there is no encrypted version of configuration file, create it.
+	//TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
+	if(access(encrypted_encfs_file, F_OK) != 0){
+		//Wait for encfs to create the file
+		while(get_file_size(path_with_encfs_file) == 0);
+		//Read file
+		READ_FILE(path_with_encfs_file, encfs_configuration_data)
+		printf("Read the following encfs configuration data from file: %s\n", encfs_configuration_data);
+		//Prepend path
+		SEPARATE_STRINGS(encrypted_directory, encfs_configuration_data, path_and_encfs_configuration_data)
+		//Encrypt the data and write to file
+		sign_and_encrypt(path_and_encfs_configuration_data, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, ENCFS_CONFIGURATION_FILE);
+	}
 }
 
 void start_encfs_for_directory(char *dir){
