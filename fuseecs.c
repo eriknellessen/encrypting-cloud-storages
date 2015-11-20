@@ -126,6 +126,26 @@ if(memcpy(RESULT, plain_text, length) != RESULT){\
 RESULT[length - 1] = 0;\
 gpgme_free(plain_text);
 
+#define DECRYPT_PASSWORD_AN_VERIFY_PATH(PATH, RESULT) size_t password_length;\
+size_t end_of_path;\
+LOCAL_STR_CAT(PATH, PASSWORD_FILE_NAME, path_without_file_ending)\
+LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
+DECRYPT_AND_VERIFY(path_with_file_ending, path_and_password)\
+{\
+char *end_of_path_string = strchr(path_and_password, PATH_AND_PASSWORD_SEPARATOR);\
+end_of_path = end_of_path_string - path_and_password;\
+char path[end_of_path + 1];\
+strncpy(path, path_and_password, end_of_path);\
+path[end_of_path] = 0;\
+if(strcmp(path, PATH)){\
+	fprintf(stderr, "Password for path %s in path %s.\n", PATH, path);\
+	exit(-1);\
+}\
+password_length = strlen(path_and_password - (end_of_path + 1));\
+}\
+char RESULT[password_length + 1];\
+strcpy(RESULT, path_and_password + end_of_path + 1);
+
 enum Access_policy{DROPBOX, ENCFS, USER};
 
 //gpg2 --sign --local-user A6506F46 --encrypt -r A6506F46 --output xxx.txt.gpg xxx.txt
@@ -167,21 +187,28 @@ void create_encfs_directory(const char *encrypted_directory){
 	//Create random password and encrypt it
 	GET_RANDOM_PASSWORD(password)
 	printf("password before encryption: %s\n", password);
-	//TODO: We need to also sign the fingerprint and the path. Otherwise, the storage provider could
-	//put the same password file in all folders.
-	sign_and_encrypt(password, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
+	//We need to also sign the path. Otherwise, the storage provider could
+	//put the same password file in all folders and we would only use one password for everything.
+	/*
+	 * Format: "/path/to/folder/encrypted/with/the/password\npassword"
+	 */
+	char separator_string[] = PATH_AND_PASSWORD_SEPARATOR_STRING;
+	LOCAL_STR_CAT(encrypted_directory, separator_string, encrypted_directory_with_linebreak)
+	LOCAL_STR_CAT(encrypted_directory_with_linebreak, password, plain_text)
+	sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 }
 
 void start_encfs(const char *encrypted_directory, const char *mount_point){
-	//If the folder has not yet been initiated with encrypted password and so on
-	//(Check signature of password file)
-	create_encfs_directory(encrypted_directory);
+	//If the folder has not yet been initiated with encrypted password and so on, initiate it
+	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_file)
+	LOCAL_STR_CAT(path_with_file, ENCRYPTED_FILE_ENDING, encrypted_password_file)
+	if(access(encrypted_password_file, F_OK) == -1){
+		create_encfs_directory(encrypted_directory);
+	}
 	
 	//If the folder has already been created
 	//Get decrypted password
-	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_without_file_ending)
-	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)
-	DECRYPT_AND_VERIFY(path_with_file_ending, password)
+	DECRYPT_PASSWORD_AN_VERIFY_PATH(encrypted_directory, password)
 	printf("password after decryption: %s\n", password);
 	//TODO: If there is an encrypted version of the configuration file, decrypt it.
 	LOCAL_STR_CAT("echo ", password, echo_password_string)
