@@ -1,3 +1,6 @@
+#ifndef CONFIGURATION_H
+#define CONFIGURATION_H
+
 #define BUFFER_SIZE 1024
 
 #define ACCESS_USER_ID 1000
@@ -21,3 +24,5 @@
 
 #define MAKEPASSWD_COMMAND "makepasswd --chars "
 #define PASSWORD_LENGTH_STRING "64"
+
+#endif

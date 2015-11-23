@@ -38,140 +38,8 @@
 #include <gpgme.h>
 
 #include "configuration.h"
-
-#define LOCAL_STR_CAT(START, END, RESULT) char RESULT[sizeof(char) * (strlen(START) + strlen(END) + 1)];\
-strcpy(RESULT, START);\
-strcat(RESULT, END);
-
-#define CONCATENATED_PATH concatenated_path
-#define GET_RETURN_VALUE(START_OF_PATH, FUNCTION_CALL) LOCAL_STR_CAT(START_OF_PATH, path, CONCATENATED_PATH)\
-return_value = FUNCTION_CALL;
-#define CHANGE_PATH(FUNCTION_CALL) printf(#FUNCTION_CALL": %s\n", path);\
-enum Access_policy ap = check_access(fuse_get_context());\
-printf("ap: %i\n", ap);\
-printf("path: %s\n", path);\
-printf("uid: %i\n", fuse_get_context()->uid);\
-int return_value;\
-if(ap == USER){\
-	GET_RETURN_VALUE(DECRYPTED_DIRECTORY, FUNCTION_CALL)\
-} else { \
-	GET_RETURN_VALUE(ROOT_DIRECTORY, FUNCTION_CALL)\
-}\
-return return_value;
-
-#define GET_DECRYPTED_FOLDER_NAME(DIRECTORY) encfsctl decode --extpass="echo password" DIRECTORY
-
-#define GET_RANDOM_PASSWORD(RESULT) char *get_random_password_data = NULL;\
-{\
-	LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
-	FILE *pipe = popen(cmd, "r");\
-	\
-	char buffer[BUFFER_SIZE];\
-	int size;\
-	int pos = 0;\
-	\
-	if(pipe) {\
-		while(fgets(buffer, BUFFER_SIZE, pipe) != NULL) {\
-			size = strlen(buffer);\
-			get_random_password_data = realloc(get_random_password_data, pos + size);\
-			memcpy(&get_random_password_data[pos], buffer, size);\
-			pos += size;\
-		}\
-	}\
-	\
-	if(pclose(pipe)){\
-		fprintf(stderr, "Could not generate password.\n");\
-		exit(-1);\
-	}\
-	\
-}\
-char RESULT[strlen(get_random_password_data)];\
-memcpy(RESULT, get_random_password_data, strlen(get_random_password_data));\
-RESULT[strlen(get_random_password_data) - 1] = 0;\
-free(get_random_password_data);
-
-//TODO: Check, if the signature has been made with the expected key.
-#define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
-size_t length;\
-{\
-	gpgme_ctx_t gpgme_ctx;\
-	if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){\
-		fprintf(stderr, "Could not create gpg context.\n");\
-		exit(-1);\
-	}\
-	gpgme_data_t gpgme_encrypted_data;\
-	if(gpgme_data_new_from_file(&gpgme_encrypted_data, PATH, 1) != GPG_ERR_NO_ERROR){\
-		fprintf(stderr, "Could not read encrypted data from file %s.\n", PATH);\
-		exit(-1);\
-	}\
-	gpgme_data_t gpgme_decrypted_data;\
-	if(gpgme_data_new(&gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
-		fprintf(stderr, "Could not read encrypted data from file %s.\n", PATH);\
-		exit(-1);\
-	}\
-	if(gpgme_op_decrypt_verify(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
-		fprintf(stderr, "Could not decrypt and verify file %s.\n", PATH);\
-		exit(-1);\
-	}\
-	gpgme_data_release(gpgme_encrypted_data);\
-	gpgme_release(gpgme_ctx);\
-	\
-	plain_text = gpgme_data_release_and_get_mem(gpgme_decrypted_data, &length);\
-}\
-char RESULT[length];\
-if(memcpy(RESULT, plain_text, length) != RESULT){\
-	fprintf(stderr, "Could not copy decrypted data.\n");\
-	exit(-1);\
-}\
-RESULT[length - 1] = 0;\
-gpgme_free(plain_text);
-
-#define DECRYPT_DATA_AND_VERIFY_PATH(PATH, FILE_NAME, RESULT) size_t password_length;\
-size_t end_of_path;\
-LOCAL_STR_CAT(PATH, FILE_NAME, path_without_file_ending)\
-LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
-DECRYPT_AND_VERIFY(path_with_file_ending, path_and_password)\
-{\
-char *end_of_path_string = strchr(path_and_password, PATH_SEPARATOR);\
-end_of_path = end_of_path_string - path_and_password;\
-char path[end_of_path + 1];\
-strncpy(path, path_and_password, end_of_path);\
-path[end_of_path] = 0;\
-if(strcmp(path, PATH)){\
-	fprintf(stderr, "Password for path %s in path %s.\n", PATH, path);\
-	exit(-1);\
-}\
-password_length = strlen(path_and_password - (end_of_path + 1));\
-}\
-char RESULT[password_length + 1];\
-strcpy(RESULT, path_and_password + end_of_path + 1);
-
-#define READ_FILE(PATH, RESULT) FILE *f = fopen(PATH, "r");\
-if(f == NULL){\
-	fprintf(stderr, "Could not read file %s.\n", PATH);\
-	exit(-1);\
-}\
-fseek(f, 0, SEEK_END);\
-long pos = ftell(f);\
-fseek(f, 0, SEEK_SET);\
-char RESULT[pos + 1];\
-fread(RESULT, pos, 1, f);\
-RESULT[pos] = 0;\
-fclose(f);
-
-#define WRITE_FILE(PATH, DATA) {\
-FILE *f = fopen(PATH, "w");\
-if(f == NULL){\
-	fprintf(stderr, "Could not read file %s (when trying to write to it).\n", PATH);\
-	exit(-1);\
-}\
-fputs(DATA, f);\
-fclose(f);\
-}
-
-#define SEPARATE_STRINGS(FIRST, SECOND, RESULT) char separator_string[] = PATH_SEPARATOR_STRING;\
-LOCAL_STR_CAT(FIRST, separator_string, first_string_with_separator)\
-LOCAL_STR_CAT(first_string_with_separator, SECOND, RESULT)
+#include "data_operations.h"
+#include "gpg_operations.h"
 
 enum Access_policy{DROPBOX, ENCFS, USER};
 
@@ -185,29 +53,6 @@ long get_file_size(char *path){
 	long return_value = ftell(f);
 	fclose(f);
 	return return_value;
-}
-
-//gpg2 --sign --local-user A6506F46 --encrypt -r A6506F46 --output xxx.txt.gpg xxx.txt
-void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
-	LOCAL_STR_CAT("echo \'", data, cmd0)
-	LOCAL_STR_CAT(cmd0, "\'", cmd1)
-	LOCAL_STR_CAT(cmd1, " | ", cmd2)
-	LOCAL_STR_CAT(cmd2, GPG_SIGN_COMMAND, cmd3)
-	LOCAL_STR_CAT(cmd3, OWN_PUBLIC_KEY_FINGERPRINT, cmd4)
-	LOCAL_STR_CAT(cmd4, GPG_ENCRYPTION_OPTION, cmd5)
-	LOCAL_STR_CAT(cmd5, OWN_PUBLIC_KEY_FINGERPRINT, cmd6)
-	LOCAL_STR_CAT(cmd6, GPG_OUTPUT_OPTION, cmd7)
-	LOCAL_STR_CAT(cmd7, path, cmd8)
-	LOCAL_STR_CAT(cmd8, file_name, cmd9)
-	LOCAL_STR_CAT(cmd9, ENCRYPTED_FILE_ENDING, concatenated_cmd)
-	
-	//Debug
-	printf("concatenated_cmd: %s\n", concatenated_cmd);
-	
-	if(system(concatenated_cmd)){
-		fprintf(stderr, "Could not sign and encrypt data.\n");
-		exit(-1);
-	}
 }
 
 void create_encfs_directory(const char *encrypted_directory){
@@ -239,7 +84,8 @@ void create_encfs_directory(const char *encrypted_directory){
 void start_encfs(const char *encrypted_directory, const char *mount_point){
 	//If the folder has not yet been initiated with encrypted password and so on, initiate it
 	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
-	LOCAL_STR_CAT(path_with_password_file, ENCRYPTED_FILE_ENDING, encrypted_password_file)
+	LOCAL_STR_CAT(path_with_password_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_password_file_and_own_fingerprint)
+	LOCAL_STR_CAT(path_with_password_file_and_own_fingerprint, ENCRYPTED_FILE_ENDING, encrypted_password_file)
 	if(access(encrypted_password_file, F_OK) == -1){
 		create_encfs_directory(encrypted_directory);
 	}
@@ -249,9 +95,11 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 	//If there is an encrypted version of the configuration file, decrypt it.
 	//Decrypt data, check signature, check path
 	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_encfs_file)
-	LOCAL_STR_CAT(path_with_encfs_file, ENCRYPTED_FILE_ENDING, encrypted_encfs_file)
+	LOCAL_STR_CAT(path_with_encfs_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_encfs_file_and_own_fingerprint)
+	LOCAL_STR_CAT(path_with_encfs_file_and_own_fingerprint, ENCRYPTED_FILE_ENDING, encrypted_encfs_file)
 	if(access(encrypted_encfs_file, F_OK) == 0){
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, ENCFS_CONFIGURATION_FILE, encfs_configuration_data)
+		LOCAL_STR_CAT(ENCFS_CONFIGURATION_FILE, OWN_PUBLIC_KEY_FINGERPRINT, encfs_configuration_file_with_fingerprint)
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
 		printf("encfs configuration data after decryption: %s\n", encfs_configuration_data);
 		//Write data to file
 		WRITE_FILE(path_with_encfs_file, encfs_configuration_data)
@@ -268,7 +116,8 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 	}
 	
 	//Get decrypted password
-	DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, PASSWORD_FILE_NAME, password)
+	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)
+	DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, password_file, password)
 	printf("password after decryption: %s\n", password);
 	
 	//Start encfs process
