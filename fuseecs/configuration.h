@@ -9,6 +9,7 @@
 
 #define ROOT_DIRECTORY "/tmp/encrypted/"
 #define DECRYPTED_DIRECTORY "/tmp/decrypted/"
+#define MOUNTPOINT_DIRECTORY "/tmp/mountpoint/"
 #define ENCFS_CONFIGURATION_FILE ".encfs6.xml"
 #define ENCFS_COMMAND "encfs -o allow_other -v -d -s --stdinpass --standard "
 #define GPG_SIGN_COMMAND "gpg2 --sign --local-user "

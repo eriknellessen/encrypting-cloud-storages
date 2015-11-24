@@ -60,36 +60,57 @@ password_length = strlen(path_and_password - (end_of_path + 1));\
 char RESULT[password_length + 1];\
 strcpy(RESULT, path_and_password + end_of_path + 1);
 
-#define GET_DECRYPTED_FOLDER_NAME(DIRECTORY) encfsctl decode --extpass="echo password" DIRECTORY
+//encfsctl decode --extpass="echo password" ROOT_DIRECTORY DIRECTORY
+#define GET_DECRYPTED_FOLDER_NAME(UPPER_DIRECTORY, DIRECTORY, PASSWORD, RESULT) LOCAL_STR_CAT("encfsctl decode --extpass=\"echo ", PASSWORD, cmd_with_password)\
+LOCAL_STR_CAT(cmd_with_password, "\" ", cmd_with_password_and_ending_quotation_mark)\
+LOCAL_STR_CAT(cmd_with_password_and_ending_quotation_mark, UPPER_DIRECTORY, cmd_with_root_directory)\
+LOCAL_STR_CAT(cmd_with_root_directory, " ", cmd_with_root_directory_and_space)\
+LOCAL_STR_CAT(cmd_with_root_directory_and_space, DIRECTORY, cmd)\
+RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
 
-#define GET_RANDOM_PASSWORD(RESULT) char *get_random_password_data = NULL;\
+//encfsctl decode --extpass="echo password" ROOT_DIRECTORY DIRECTORY
+#define GET_ENCRYPTED_FOLDER_NAME(UPPER_DIRECTORY, DIRECTORY, PASSWORD, RESULT) LOCAL_STR_CAT("encfsctl encode --extpass=\"echo ", PASSWORD, cmd_with_password)\
+LOCAL_STR_CAT(cmd_with_password, "\" ", cmd_with_password_and_ending_quotation_mark)\
+LOCAL_STR_CAT(cmd_with_password_and_ending_quotation_mark, UPPER_DIRECTORY, cmd_with_root_directory)\
+LOCAL_STR_CAT(cmd_with_root_directory, " ", cmd_with_root_directory_and_space)\
+LOCAL_STR_CAT(cmd_with_root_directory_and_space, DIRECTORY, cmd)\
+RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
+
+#define GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(DIRECTORY, RESULT) char *current_root_directory;\
 {\
-	LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
-	FILE *pipe = popen(cmd, "r");\
-	\
-	char buffer[BUFFER_SIZE];\
-	int size;\
-	int pos = 0;\
-	\
-	if(pipe) {\
-		while(fgets(buffer, BUFFER_SIZE, pipe) != NULL) {\
-			size = strlen(buffer);\
-			get_random_password_data = realloc(get_random_password_data, pos + size);\
-			memcpy(&get_random_password_data[pos], buffer, size);\
-			pos += size;\
-		}\
+	char root_directory[] = ROOT_DIRECTORY;\
+	current_root_directory = root_directory;\
+	char *relative_path;\
+	/* Remove ROOT_DIRECTORY */ \
+	if(strstr(DIRECTORY, MOUNTPOINT_DIRECTORY) == DIRECTORY){\
+		relative_path = DIRECTORY + sizeof(char) * strlen(MOUNTPOINT_DIRECTORY);\
+	} else {\
+		relative_path = DIRECTORY;\
 	}\
-	\
-	if(pclose(pipe)){\
-		fprintf(stderr, "Could not generate password.\n");\
-		exit(-1);\
+	/* Debug */ \
+	printf("relative_path: %s\n", relative_path);\
+	/* Get folder names */ \
+	char *next_folder = strtok(relative_path, "/");\
+	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
+	while(next_folder != NULL){\
+		printf("current_root_directory: %s\n", current_root_directory);\
+		printf("next_folder: %s\n", next_folder);\
+		/* Get password from current root directory */ \
+		DECRYPT_DATA_AND_VERIFY_PATH(current_root_directory, password_file, password)\
+		/* Get encoded name of next folder */ \
+		GET_ENCRYPTED_FOLDER_NAME(current_root_directory, next_folder, password, encoded_folder_name)\
+		/* Set the encoded name of the next folder as next root directory */ \
+		LOCAL_STR_CAT(current_root_directory, encoded_folder_name, next_root_directory_without_slash)\
+		LOCAL_STR_CAT(next_root_directory_without_slash, "/", next_root_directory)\
+		current_root_directory = next_root_directory;\
+		next_folder = strtok(NULL, "/");\
 	}\
-	\
 }\
-char RESULT[strlen(get_random_password_data)];\
-memcpy(RESULT, get_random_password_data, strlen(get_random_password_data));\
-RESULT[strlen(get_random_password_data) - 1] = 0;\
-free(get_random_password_data);
+char RESULT[strlen(current_root_directory) + 1];\
+strcpy(RESULT, current_root_directory);
+
+#define GET_RANDOM_PASSWORD(RESULT) LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
+RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
 
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
 

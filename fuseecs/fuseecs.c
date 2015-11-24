@@ -129,6 +129,11 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 	LOCAL_STR_CAT(cmd_with_encrypted_directory, " ", cmd_with_encrypted_directory_and_space)
 	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
 	printf("before popen.\n");
+	printf("Executing the following command: %s\n", concatenated_cmd);
+	//if(system(concatenated_cmd)){
+	//	fprintf(stderr, "Error when executing encfs!\n");
+	//	exit(-1);
+	//}
 	popen(concatenated_cmd, "r");
 	
 	//Debug

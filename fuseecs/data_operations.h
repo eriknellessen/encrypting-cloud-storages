@@ -51,4 +51,32 @@ fclose(f);\
 LOCAL_STR_CAT(FIRST, separator_string, first_string_with_separator)\
 LOCAL_STR_CAT(first_string_with_separator, SECOND, RESULT) 
 
+#define RUN_COMMAND_AND_GET_OUTPUT(COMMAND, RESULT) char *data = NULL;\
+int pos = 0;\
+{\
+	FILE *pipe = popen(COMMAND, "r");\
+	\
+	char buffer[BUFFER_SIZE];\
+	int size;\
+	\
+	if(pipe) {\
+		while(fgets(buffer, BUFFER_SIZE, pipe) != NULL) {\
+			size = strlen(buffer);\
+			data = realloc(data, pos + size);\
+			memcpy(&data[pos], buffer, size);\
+			pos += size;\
+		}\
+	}\
+	\
+	if(pclose(pipe)){\
+		fprintf(stderr, "Could not run command: %s.\n", COMMAND);\
+		exit(-1);\
+	}\
+	\
+}\
+char RESULT[pos];\
+memcpy(RESULT, data, pos);\
+RESULT[pos - 1] = 0;\
+free(data);
+
 #endif
