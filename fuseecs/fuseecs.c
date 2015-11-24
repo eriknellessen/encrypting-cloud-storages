@@ -82,6 +82,9 @@ void create_encfs_directory(const char *encrypted_directory){
 }
 
 void start_encfs(const char *encrypted_directory, const char *mount_point){
+	//Debug
+	printf("start_encfs called. encrypted_directory: %s, mount_point: %s\n", encrypted_directory, mount_point);
+	
 	//If the folder has not yet been initiated with encrypted password and so on, initiate it
 	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
 	LOCAL_STR_CAT(path_with_password_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_password_file_and_own_fingerprint)
@@ -165,38 +168,44 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 	}
 }
 
-void start_encfs_for_directory(char *dir){
+void start_encfs_for_directory(char *encrypted_directory){
+	//Debug
+	printf("start_encfs_for_directory called. encrypted_directory: %s\n", encrypted_directory);
+	
 	//Start encfs for the correct folder.
 	//Get correct directory name
-	/*
-	 * if(strcmp(dir, ROOT_DIRECTORY) == 0){
-	 * 	start_encfs(dir, DECRYPTED_DIRECTORY);
-	 * } else {
-	 * 	GET_DECRYPTED_FOLDER_NAME(dir)
-	 * 	start_encfs(dir, decrypted_folder_name);
-	 * }
-	*/
+	 if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
+	 	start_encfs(encrypted_directory, DECRYPTED_DIRECTORY);
+	 } else {
+	 	GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_folder_name)
+	 	start_encfs(encrypted_directory, decrypted_folder_name);
+	 }
+	
 	struct dirent *m_dirent;
 	
-	DIR *m_dir = opendir(dir);
+	DIR *m_dir = opendir(encrypted_directory);
 	if(m_dir == NULL){
-		fprintf(stderr, "Can't open %s\n", dir);
+		fprintf(stderr, "Can't open %s\n", encrypted_directory);
 		exit(-1);
 	}
 	
 	while((m_dirent = readdir(m_dir)) != NULL){
-		struct stat stbuf;
-		LOCAL_STR_CAT(dir,"/", path)
-		LOCAL_STR_CAT(path, m_dirent->d_name, path_with_file)
-		if(stat(path_with_file, &stbuf) == -1){
-			fprintf(stderr, "Unable to stat file: %s\n",path_with_file) ;
-			exit(-1);
-		}
+		if(strcmp(m_dirent->d_name, ".") && strcmp(m_dirent->d_name, "..")){
+			struct stat stbuf;
+			LOCAL_STR_CAT(encrypted_directory,"/", path)
+			LOCAL_STR_CAT(path, m_dirent->d_name, path_with_file)
+			printf("start_encfs_for_directory: examining file %s\n", path_with_file);
+			if(stat(path_with_file, &stbuf) == -1){
+				fprintf(stderr, "Unable to stat file: %s\n", path_with_file) ;
+				exit(-1);
+			}
 
-		if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
-			//Directory
-			//Recursive call
-			start_encfs_for_directory(path_with_file);
+			if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
+				printf("start_encfs_for_directory: I think, this is a directory!\n");
+				//Directory
+				//Recursive call
+				start_encfs_for_directory(path_with_file);
+			}
 		}
 	}
 }
@@ -275,7 +284,18 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
-	CHANGE_PATH(xmp_mkdir(CONCATENATED_PATH, mode))
+	enum Access_policy ap = check_access(fuse_get_context());
+	int return_value;
+	if(ap == USER){
+		GET_RETURN_VALUE(DECRYPTED_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
+	} else {
+		GET_RETURN_VALUE(ROOT_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
+		LOCAL_STR_CAT(ROOT_DIRECTORY, path, path_to_new_encrypted_folder)
+		GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(path_to_new_encrypted_folder, mount_point)
+		//TODO: Check, if folder already exists at that point. If not, wait.
+		start_encfs(path_to_new_encrypted_folder, mount_point);
+	}
+	return return_value;
 }
 
 static int ecs_unlink(const char *path)
@@ -430,7 +450,7 @@ static struct fuse_operations ecs_oper = {
 int main(int argc, char *argv[])
 {
 	gpgme_check_version(NULL);
-	start_encfs(ROOT_DIRECTORY, DECRYPTED_DIRECTORY);
+	start_encfs_for_directory(ROOT_DIRECTORY);
 	umask(0);
 	return fuse_main(argc, argv, &ecs_oper, NULL);
 }

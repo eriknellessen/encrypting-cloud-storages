@@ -4,6 +4,9 @@
 #include <gpgme.h>
 #include "data_operations.h"
 
+#define ENCRYPT 0
+#define DECRYPT 1
+
 //TODO: Check, if the signature has been made with the expected key.
 #define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
 size_t length;\
@@ -76,15 +79,22 @@ LOCAL_STR_CAT(cmd_with_root_directory, " ", cmd_with_root_directory_and_space)\
 LOCAL_STR_CAT(cmd_with_root_directory_and_space, DIRECTORY, cmd)\
 RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
 
-#define GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(DIRECTORY, RESULT) char *current_root_directory;\
+#define GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, MODE, RESULT) char *current_root_directory;\
+char *current_decrypted_path;\
 {\
 	char root_directory[] = ROOT_DIRECTORY;\
 	current_root_directory = root_directory;\
+	char decrypted_directory[] = DECRYPTED_DIRECTORY;\
+	current_decrypted_path = decrypted_directory;\
 	char *relative_path;\
 	/* Remove ROOT_DIRECTORY */ \
 	if(strstr(DIRECTORY, MOUNTPOINT_DIRECTORY) == DIRECTORY){\
 		relative_path = DIRECTORY + sizeof(char) * strlen(MOUNTPOINT_DIRECTORY);\
-	} else {\
+	} else if(strstr(DIRECTORY, DECRYPTED_DIRECTORY) == DIRECTORY){\
+		relative_path = DIRECTORY + sizeof(char) * strlen(DECRYPTED_DIRECTORY);\
+	} else if(strstr(DIRECTORY, ROOT_DIRECTORY) == DIRECTORY){\
+		relative_path = DIRECTORY + sizeof(char) * strlen(ROOT_DIRECTORY);\
+	} else{\
 		relative_path = DIRECTORY;\
 	}\
 	/* Debug */ \
@@ -94,20 +104,52 @@ RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
 	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
 	while(next_folder != NULL){\
 		printf("current_root_directory: %s\n", current_root_directory);\
+		printf("current_decrypted_path: %s\n", current_decrypted_path);\
 		printf("next_folder: %s\n", next_folder);\
+		char *current_transformed_folder_name;\
 		/* Get password from current root directory */ \
 		DECRYPT_DATA_AND_VERIFY_PATH(current_root_directory, password_file, password)\
 		/* Get encoded name of next folder */ \
-		GET_ENCRYPTED_FOLDER_NAME(current_root_directory, next_folder, password, encoded_folder_name)\
+		if(MODE == ENCRYPT){\
+			GET_ENCRYPTED_FOLDER_NAME(current_root_directory, next_folder, password, encoded_folder_name)\
+			current_transformed_folder_name = encoded_folder_name;\
+		} else {\
+			GET_DECRYPTED_FOLDER_NAME(current_root_directory, next_folder, password, decoded_folder_name)\
+			current_transformed_folder_name = decoded_folder_name;\
+		}\
 		/* Set the encoded name of the next folder as next root directory */ \
-		LOCAL_STR_CAT(current_root_directory, encoded_folder_name, next_root_directory_without_slash)\
+		char *next_root_directory_without_slash;\
+		if(MODE == ENCRYPT){\
+			LOCAL_STR_CAT(current_root_directory, current_transformed_folder_name, result)\
+			next_root_directory_without_slash = result;\
+		} else {\
+			LOCAL_STR_CAT(current_root_directory, next_folder, result)\
+			/* TODO: This is probably not correct, as the variable might be destroyed. Look this up. SEEMS TO REALLY GO WRONG. FIX THIS. BUG.*/ \
+			next_root_directory_without_slash = result;\
+			LOCAL_STR_CAT(current_decrypted_path, current_transformed_folder_name, grown_decrypted_path)\
+			current_decrypted_path = grown_decrypted_path;\
+		}\
 		LOCAL_STR_CAT(next_root_directory_without_slash, "/", next_root_directory)\
 		current_root_directory = next_root_directory;\
 		next_folder = strtok(NULL, "/");\
 	}\
 }\
-char RESULT[strlen(current_root_directory) + 1];\
-strcpy(RESULT, current_root_directory);
+printf("current_root_directory: %s\n", current_root_directory);\
+printf("current_decrypted_path: %s\n", current_decrypted_path);\
+int length;\
+char *string_to_copy_from;\
+if(MODE == ENCRYPT){\
+	length = strlen(current_root_directory) + 1;\
+	string_to_copy_from = current_root_directory;\
+} else {\
+	length = strlen(current_decrypted_path) + 1;\
+	string_to_copy_from = current_decrypted_path;\
+}\
+char RESULT[length];\
+strcpy(RESULT, string_to_copy_from);
+
+#define GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(DIRECTORY, RESULT) GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, ENCRYPT, RESULT)
+#define GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(DIRECTORY, RESULT) GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, DECRYPT, RESULT)
 
 #define GET_RANDOM_PASSWORD(RESULT) LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
 RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
