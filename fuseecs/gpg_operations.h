@@ -79,24 +79,26 @@ LOCAL_STR_CAT(cmd_with_root_directory, " ", cmd_with_root_directory_and_space)\
 LOCAL_STR_CAT(cmd_with_root_directory_and_space, DIRECTORY, cmd)\
 RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
 
-#define GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, MODE, RESULT) char *current_root_directory;\
-char *current_decrypted_path;\
+#define GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, MODE, RESULT) char *current_root_directory = NULL;\
+char *current_decrypted_path = NULL;\
 {\
 	char root_directory[] = ROOT_DIRECTORY;\
-	current_root_directory = root_directory;\
+	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(root_directory, current_root_directory)\
 	char decrypted_directory[] = DECRYPTED_DIRECTORY;\
-	current_decrypted_path = decrypted_directory;\
-	char *relative_path;\
+	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_directory, current_decrypted_path)\
+	const char *const_relative_path;\
 	/* Remove ROOT_DIRECTORY */ \
 	if(strstr(DIRECTORY, MOUNTPOINT_DIRECTORY) == DIRECTORY){\
-		relative_path = DIRECTORY + sizeof(char) * strlen(MOUNTPOINT_DIRECTORY);\
+		const_relative_path = DIRECTORY + sizeof(char) * strlen(MOUNTPOINT_DIRECTORY);\
 	} else if(strstr(DIRECTORY, DECRYPTED_DIRECTORY) == DIRECTORY){\
-		relative_path = DIRECTORY + sizeof(char) * strlen(DECRYPTED_DIRECTORY);\
+		const_relative_path = DIRECTORY + sizeof(char) * strlen(DECRYPTED_DIRECTORY);\
 	} else if(strstr(DIRECTORY, ROOT_DIRECTORY) == DIRECTORY){\
-		relative_path = DIRECTORY + sizeof(char) * strlen(ROOT_DIRECTORY);\
+		const_relative_path = DIRECTORY + sizeof(char) * strlen(ROOT_DIRECTORY);\
 	} else{\
-		relative_path = DIRECTORY;\
+		const_relative_path = DIRECTORY;\
 	}\
+	char relative_path[strlen(const_relative_path) + 1];\
+	strcpy(relative_path, const_relative_path);\
 	/* Debug */ \
 	printf("relative_path: %s\n", relative_path);\
 	/* Get folder names */ \
@@ -106,31 +108,33 @@ char *current_decrypted_path;\
 		printf("current_root_directory: %s\n", current_root_directory);\
 		printf("current_decrypted_path: %s\n", current_decrypted_path);\
 		printf("next_folder: %s\n", next_folder);\
-		char *current_transformed_folder_name;\
+		char *current_transformed_folder_name = NULL;\
 		/* Get password from current root directory */ \
 		DECRYPT_DATA_AND_VERIFY_PATH(current_root_directory, password_file, password)\
 		/* Get encoded name of next folder */ \
 		if(MODE == ENCRYPT){\
 			GET_ENCRYPTED_FOLDER_NAME(current_root_directory, next_folder, password, encoded_folder_name)\
-			current_transformed_folder_name = encoded_folder_name;\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(encoded_folder_name, current_transformed_folder_name)\
 		} else {\
 			GET_DECRYPTED_FOLDER_NAME(current_root_directory, next_folder, password, decoded_folder_name)\
-			current_transformed_folder_name = decoded_folder_name;\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decoded_folder_name, current_transformed_folder_name)\
 		}\
 		/* Set the encoded name of the next folder as next root directory */ \
-		char *next_root_directory_without_slash;\
+		char *next_root_directory_without_slash = NULL;\
 		if(MODE == ENCRYPT){\
 			LOCAL_STR_CAT(current_root_directory, current_transformed_folder_name, result)\
-			next_root_directory_without_slash = result;\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, next_root_directory_without_slash)\
 		} else {\
 			LOCAL_STR_CAT(current_root_directory, next_folder, result)\
-			/* TODO: This is probably not correct, as the variable might be destroyed. Look this up. SEEMS TO REALLY GO WRONG. FIX THIS. BUG.*/ \
-			next_root_directory_without_slash = result;\
-			LOCAL_STR_CAT(current_decrypted_path, current_transformed_folder_name, grown_decrypted_path)\
-			current_decrypted_path = grown_decrypted_path;\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, next_root_directory_without_slash)\
+			LOCAL_STR_CAT(current_decrypted_path, current_transformed_folder_name, grown_decrypted_path_without_slash)\
+			APPEND_SLASH_IF_NECESSARY(grown_decrypted_path_without_slash, grown_decrypted_path)\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(grown_decrypted_path, current_decrypted_path)\
 		}\
-		LOCAL_STR_CAT(next_root_directory_without_slash, "/", next_root_directory)\
-		current_root_directory = next_root_directory;\
+		free(current_transformed_folder_name);\
+		APPEND_SLASH_IF_NECESSARY(next_root_directory_without_slash, next_root_directory)\
+		free(next_root_directory_without_slash);\
+		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(next_root_directory, current_root_directory)\
 		next_folder = strtok(NULL, "/");\
 	}\
 }\
@@ -146,7 +150,9 @@ if(MODE == ENCRYPT){\
 	string_to_copy_from = current_decrypted_path;\
 }\
 char RESULT[length];\
-strcpy(RESULT, string_to_copy_from);
+strcpy(RESULT, string_to_copy_from);\
+free(current_root_directory);\
+free(current_decrypted_path);
 
 #define GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(DIRECTORY, RESULT) GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, ENCRYPT, RESULT)
 #define GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(DIRECTORY, RESULT) GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, DECRYPT, RESULT)

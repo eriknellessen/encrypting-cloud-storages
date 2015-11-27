@@ -41,7 +41,7 @@
 #include "data_operations.h"
 #include "gpg_operations.h"
 
-enum Access_policy{DROPBOX, ENCFS, USER};
+enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
 
 long get_file_size(char *path){
 	FILE *f = fopen(path, "r");
@@ -81,9 +81,12 @@ void create_encfs_directory(const char *encrypted_directory){
 	sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 }
 
-void start_encfs(const char *encrypted_directory, const char *mount_point){
+void start_encfs(const char *encrypted_directory_maybe_without_slash, const char *mount_point_maybe_without_slash){
 	//Debug
-	printf("start_encfs called. encrypted_directory: %s, mount_point: %s\n", encrypted_directory, mount_point);
+	printf("start_encfs called. encrypted_directory: %s, mount_point: %s\n", encrypted_directory_maybe_without_slash, mount_point_maybe_without_slash);
+	
+	APPEND_SLASH_IF_NECESSARY_REPEATABLE(encrypted_directory_maybe_without_slash, encrypted_directory)
+	APPEND_SLASH_IF_NECESSARY_REPEATABLE(mount_point_maybe_without_slash, mount_point)
 	
 	//If the folder has not yet been initiated with encrypted password and so on, initiate it
 	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
@@ -166,6 +169,9 @@ void start_encfs(const char *encrypted_directory, const char *mount_point){
 		//Encrypt the data and write to file
 		sign_and_encrypt(path_and_encfs_configuration_data, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, ENCFS_CONFIGURATION_FILE);
 	}
+	
+	free(encrypted_directory);
+	free(mount_point);
 }
 
 void start_encfs_for_directory(char *encrypted_directory){
@@ -192,7 +198,7 @@ void start_encfs_for_directory(char *encrypted_directory){
 	while((m_dirent = readdir(m_dir)) != NULL){
 		if(strcmp(m_dirent->d_name, ".") && strcmp(m_dirent->d_name, "..")){
 			struct stat stbuf;
-			LOCAL_STR_CAT(encrypted_directory,"/", path)
+			APPEND_SLASH_IF_NECESSARY(encrypted_directory, path)
 			LOCAL_STR_CAT(path, m_dirent->d_name, path_with_file)
 			printf("start_encfs_for_directory: examining file %s\n", path_with_file);
 			if(stat(path_with_file, &stbuf) == -1){
@@ -224,6 +230,7 @@ enum Access_policy check_access(struct fuse_context *fc){
 	
 	//Check if it is EncFS
 	//Build command to get the command name of the process
+	/*
 	char pid[10];
 	int bytes_written = snprintf(pid, sizeof(pid), "%d", fc->pid);
 	printf("%s\n", pid);
@@ -252,6 +259,7 @@ enum Access_policy check_access(struct fuse_context *fc){
 			return ENCFS;
 		}
 	}
+	*/
 	//Then it is the user
 	return USER;
 }
@@ -284,17 +292,18 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
-	enum Access_policy ap = check_access(fuse_get_context());
 	int return_value;
-	if(ap == USER){
-		GET_RETURN_VALUE(DECRYPTED_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
-	} else {
-		GET_RETURN_VALUE(ROOT_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
-		LOCAL_STR_CAT(ROOT_DIRECTORY, path, path_to_new_encrypted_folder)
-		GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(path_to_new_encrypted_folder, mount_point)
-		//TODO: Check, if folder already exists at that point. If not, wait.
-		start_encfs(path_to_new_encrypted_folder, mount_point);
-	}
+	//Encfs will not take this way, it takes directly the way to the encrypted folder. So we have to do this in every case.
+	//Create new folder in decrypted directory
+	GET_RETURN_VALUE(DECRYPTED_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
+	
+	//Now start encfs in the new encrypted folder, which encfs just created
+	GET_FOLDER_NAME_ITERATIVELY(path, ENCRYPT, path_to_new_encrypted_folder)
+	//Check, if folder already exists at that point. If not, wait.
+	while(access(path_to_new_encrypted_folder, F_OK) != 0);
+	LOCAL_STR_CAT(DECRYPTED_DIRECTORY, path, full_decrypted_path)
+	start_encfs(path_to_new_encrypted_folder, full_decrypted_path);
+	
 	return return_value;
 }
 

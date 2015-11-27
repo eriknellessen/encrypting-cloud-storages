@@ -79,4 +79,29 @@ memcpy(RESULT, data, pos);\
 RESULT[pos - 1] = 0;\
 free(data);
 
+#define PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(LOCAL_STR, OUTER_VARIABLE) if(OUTER_VARIABLE != NULL){\
+	free(OUTER_VARIABLE);\
+}\
+OUTER_VARIABLE = malloc(strlen(LOCAL_STR) + 1);\
+strcpy(OUTER_VARIABLE, LOCAL_STR);
+
+#define APPEND_SLASH_IF_NECESSARY(STRING, RESULT) int slash_needed = 0;\
+if(STRING[strlen(STRING) - 1] != '/'){\
+	slash_needed = 1;\
+}\
+char RESULT[strlen(STRING) + 1 + slash_needed];\
+if(slash_needed){\
+	strcpy(RESULT, STRING);\
+	RESULT[strlen(STRING)] = '/';\
+	RESULT[strlen(STRING) + 1] = 0;\
+} else {\
+	strcpy(RESULT, STRING);\
+}
+
+#define APPEND_SLASH_IF_NECESSARY_REPEATABLE(STRING, RESULT) char *RESULT = NULL;\
+{\
+	APPEND_SLASH_IF_NECESSARY(STRING, result)\
+	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+}
+
 #endif
