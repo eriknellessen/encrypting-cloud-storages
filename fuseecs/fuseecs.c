@@ -298,7 +298,7 @@ static int ecs_mkdir(const char *path, mode_t mode)
 	GET_RETURN_VALUE(DECRYPTED_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
 	
 	//Now start encfs in the new encrypted folder, which encfs just created
-	GET_FOLDER_NAME_ITERATIVELY(path, ENCRYPT, path_to_new_encrypted_folder)
+	GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(path, path_to_new_encrypted_folder)
 	//Check, if folder already exists at that point. If not, wait.
 	while(access(path_to_new_encrypted_folder, F_OK) != 0);
 	LOCAL_STR_CAT(DECRYPTED_DIRECTORY, path, full_decrypted_path)
