@@ -56,6 +56,9 @@ long get_file_size(char *path){
 }
 
 void create_encfs_directory(const char *encrypted_directory){
+	//Debug
+	printf("create_encfs_directory called. encrypted_directory: %s\n", encrypted_directory);
+	
 	//Create configuration file with the right access rights (so Dropbox can not access it)
 	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_file)
 	LOCAL_STR_CAT("touch ", path_with_file, touch_cmd)
@@ -75,10 +78,31 @@ void create_encfs_directory(const char *encrypted_directory){
 	//We need to also sign the path. Otherwise, the storage provider could
 	//put the same password file in all folders and we would only use one password for everything.
 	/*
-	 * Format: "/path/to/folder/encrypted/with/the/password\npassword"
+	 * Format: "/path/to/folder/encrypted/with/the/password\0x01password"
 	 */
 	SEPARATE_STRINGS(encrypted_directory, password, plain_text)
-	sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
+	//When in top folder, perform asymmetric encryption. Else, just put the password and path
+	//in .password file and let Encfs encrypt it
+	if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
+		//Debug
+		printf("In root directory, performing asymmetric encryption.\n");
+		
+		sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
+	} else {
+		//Debug
+		printf("Not in root directory. Writing password to file.\n");
+		
+		GET_FOLDER_NAME_ITERATIVELY(encrypted_directory, DECRYPT, decrypted_path)
+		LOCAL_STR_CAT(decrypted_path, "../", one_folder_above_decrypted_path)
+		STRIP_UPPER_DIRECTORIES_AND_SLASH(encrypted_directory, stripped_path)
+		//Debug
+		printf("Stripped path: %s.\n", stripped_path);
+		
+		LOCAL_STR_CAT(PASSWORD_FILE_NAME, stripped_path, password_file_with_stripped_path)
+		free(stripped_path);
+		LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)
+		WRITE_FILE(password_path, plain_text)
+	}
 }
 
 void start_encfs(const char *encrypted_directory_maybe_without_slash, const char *mount_point_maybe_without_slash){
@@ -89,10 +113,10 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	APPEND_SLASH_IF_NECESSARY_REPEATABLE(mount_point_maybe_without_slash, mount_point)
 	
 	//If the folder has not yet been initiated with encrypted password and so on, initiate it
-	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
-	LOCAL_STR_CAT(path_with_password_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_password_file_and_own_fingerprint)
-	LOCAL_STR_CAT(path_with_password_file_and_own_fingerprint, ENCRYPTED_FILE_ENDING, encrypted_password_file)
-	if(access(encrypted_password_file, F_OK) == -1){
+	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_encfs_file)
+	LOCAL_STR_CAT(path_with_encfs_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_encfs_file_and_own_fingerprint)
+	LOCAL_STR_CAT(path_with_encfs_file_and_own_fingerprint, ENCRYPTED_FILE_ENDING, encrypted_encfs_file)
+	if(access(encrypted_encfs_file, F_OK) == -1){
 		create_encfs_directory(encrypted_directory);
 	}
 	
@@ -100,9 +124,6 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	
 	//If there is an encrypted version of the configuration file, decrypt it.
 	//Decrypt data, check signature, check path
-	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_encfs_file)
-	LOCAL_STR_CAT(path_with_encfs_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_encfs_file_and_own_fingerprint)
-	LOCAL_STR_CAT(path_with_encfs_file_and_own_fingerprint, ENCRYPTED_FILE_ENDING, encrypted_encfs_file)
 	if(access(encrypted_encfs_file, F_OK) == 0){
 		LOCAL_STR_CAT(ENCFS_CONFIGURATION_FILE, OWN_PUBLIC_KEY_FINGERPRINT, encfs_configuration_file_with_fingerprint)
 		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
@@ -122,13 +143,13 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	}
 	
 	//Get decrypted password
-	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)
-	DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, password_file, password)
+	GET_PASSWORD(encrypted_directory, password)
 	printf("password after decryption: %s\n", password);
 	
 	//Start encfs process
 	//TODO: Giving the password in that form is not a good idea, as it is visible for everyone who can view processes via ps
 	LOCAL_STR_CAT("echo ", password, echo_password_string)
+	free(password);
 	LOCAL_STR_CAT(echo_password_string, " | ", echo_password_string_with_pipe)
 	LOCAL_STR_CAT(echo_password_string_with_pipe, ENCFS_COMMAND, cmd_without_encrypted_directory)
 	LOCAL_STR_CAT(cmd_without_encrypted_directory, encrypted_directory, cmd_with_encrypted_directory)
@@ -292,6 +313,8 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
+	//TODO: Create .password file, encrypted by the top folder process
+	
 	int return_value;
 	//Encfs will not take this way, it takes directly the way to the encrypted folder. So we have to do this in every case.
 	//Create new folder in decrypted directory

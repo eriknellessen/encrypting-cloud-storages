@@ -5,6 +5,10 @@ DECRYPTED_DIRECTORY_ENCFS=/tmp/decrypted
 all:
 	gcc -Wall fusexmp.c gpg_operations.c fuseecs.c `pkg-config fuse --cflags --libs` -lgpgme -o fuseecs
 
+clean:
+	rm -rf $(MOUNTPOINT) $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
+	rm fuseecs
+
 preparations: all create_mountpoint
 
 create_mountpoint:

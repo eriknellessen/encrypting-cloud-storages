@@ -38,13 +38,13 @@ RESULT[pos] = 0;\
 fclose(f);
 
 #define WRITE_FILE(PATH, DATA) {\
-FILE *f = fopen(PATH, "w");\
-if(f == NULL){\
-	fprintf(stderr, "Could not read file %s (when trying to write to it).\n", PATH);\
-	exit(-1);\
-}\
-fputs(DATA, f);\
-fclose(f);\
+	FILE *f = fopen(PATH, "w");\
+	if(f == NULL){\
+		fprintf(stderr, "Could not read file %s (when trying to write to it).\n", PATH);\
+		exit(-1);\
+	}\
+	fputs(DATA, f);\
+	fclose(f);\
 }
 
 #define SEPARATE_STRINGS(FIRST, SECOND, RESULT) char separator_string[] = PATH_SEPARATOR_STRING;\
@@ -102,6 +102,19 @@ if(slash_needed){\
 {\
 	APPEND_SLASH_IF_NECESSARY(STRING, result)\
 	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+}
+
+#define STRIP_UPPER_DIRECTORIES_AND_SLASH(MAYBE_CONST_PATH, RESULT) char *RESULT = NULL;\
+{\
+	char not_const_path[strlen(MAYBE_CONST_PATH) + 1];\
+	strcpy(not_const_path, MAYBE_CONST_PATH);\
+	char *return_value;\
+	char *next_folder = strtok(not_const_path, "/");\
+	while(next_folder != NULL && strlen(next_folder) > 0){\
+		return_value = next_folder;\
+		next_folder = strtok(NULL, "/");\
+	}\
+	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(return_value, RESULT)\
 }
 
 #endif

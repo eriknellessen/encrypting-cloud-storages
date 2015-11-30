@@ -43,25 +43,46 @@ if(memcpy(RESULT, plain_text, length) != RESULT){\
 RESULT[length - 1] = 0;\
 gpgme_free(plain_text);
 
-#define DECRYPT_DATA_AND_VERIFY_PATH(PATH, FILE_NAME, RESULT) size_t password_length;\
+#define VERIFY_PATH(DATA, PATH, RESULT) size_t password_length;\
 size_t end_of_path;\
-LOCAL_STR_CAT(PATH, FILE_NAME, path_without_file_ending)\
-LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
-DECRYPT_AND_VERIFY(path_with_file_ending, path_and_password)\
 {\
-char *end_of_path_string = strchr(path_and_password, PATH_SEPARATOR);\
-end_of_path = end_of_path_string - path_and_password;\
-char path[end_of_path + 1];\
-strncpy(path, path_and_password, end_of_path);\
-path[end_of_path] = 0;\
-if(strcmp(path, PATH)){\
-	fprintf(stderr, "Password for path %s in path %s.\n", PATH, path);\
-	exit(-1);\
-}\
-password_length = strlen(path_and_password - (end_of_path + 1));\
+	char *end_of_path_string = strchr(DATA, PATH_SEPARATOR);\
+	end_of_path = end_of_path_string - DATA;\
+	char path[end_of_path + 1];\
+	strncpy(path, DATA, end_of_path);\
+	path[end_of_path] = 0;\
+	if(strcmp(path, PATH)){\
+		fprintf(stderr, "Password for path %s in path %s.\n", PATH, path);\
+		exit(-1);\
+	}\
+	password_length = strlen(DATA - (end_of_path + 1));\
 }\
 char RESULT[password_length + 1];\
-strcpy(RESULT, path_and_password + end_of_path + 1);
+strcpy(RESULT, DATA + end_of_path + 1);
+
+#define DECRYPT_DATA_AND_VERIFY_PATH(PATH, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH, FILE_NAME, path_without_file_ending)\
+LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
+DECRYPT_AND_VERIFY(path_with_file_ending, path_and_password)\
+VERIFY_PATH(path_and_password, PATH, RESULT)
+
+#define GET_PASSWORD(PATH, RESULT) GET_FOLDER_NAME_ITERATIVELY(PATH, DECRYPT, decrypted_path)\
+GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
+
+#define GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, DECRYPTED_PATH, RESULT) char *RESULT = NULL;\
+if(strcmp(PATH, ROOT_DIRECTORY) == 0){\
+	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
+	DECRYPT_DATA_AND_VERIFY_PATH(PATH, password_file, result)\
+	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+} else {\
+	LOCAL_STR_CAT(DECRYPTED_PATH, "../", one_folder_above_decrypted_path)\
+	STRIP_UPPER_DIRECTORIES_AND_SLASH(PATH, stripped_path)\
+	LOCAL_STR_CAT(PASSWORD_FILE_NAME, stripped_path, password_file_with_stripped_path)\
+	free(stripped_path);\
+	LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)\
+	READ_FILE(password_path, path_with_password)\
+	VERIFY_PATH(path_with_password, PATH, result)\
+	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+}
 
 //encfsctl decode --extpass="echo password" ROOT_DIRECTORY DIRECTORY
 #define GET_DECRYPTED_FOLDER_NAME(UPPER_DIRECTORY, DIRECTORY, PASSWORD, RESULT) LOCAL_STR_CAT("encfsctl decode --extpass=\"echo ", PASSWORD, cmd_with_password)\
@@ -110,7 +131,7 @@ char *current_decrypted_path = NULL;\
 		printf("next_folder: %s\n", next_folder);\
 		char *current_transformed_folder_name = NULL;\
 		/* Get password from current root directory */ \
-		DECRYPT_DATA_AND_VERIFY_PATH(current_root_directory, password_file, password)\
+		GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(current_root_directory, current_decrypted_path, password)\
 		/* Get encoded name of next folder */ \
 		if(MODE == ENCRYPT){\
 			GET_ENCRYPTED_FOLDER_NAME(current_root_directory, next_folder, password, encoded_folder_name)\
@@ -121,20 +142,30 @@ char *current_decrypted_path = NULL;\
 		}\
 		/* Set the encoded name of the next folder as next root directory */ \
 		char *next_root_directory_without_slash = NULL;\
+		char *next_decrypted_path_without_slash = NULL;\
 		if(MODE == ENCRYPT){\
+			LOCAL_STR_CAT(current_decrypted_path, next_folder, grown_decrypted_path_without_slash)\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(grown_decrypted_path_without_slash, next_decrypted_path_without_slash)\
 			LOCAL_STR_CAT(current_root_directory, current_transformed_folder_name, result)\
 			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, next_root_directory_without_slash)\
 		} else {\
 			LOCAL_STR_CAT(current_root_directory, next_folder, result)\
 			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, next_root_directory_without_slash)\
 			LOCAL_STR_CAT(current_decrypted_path, current_transformed_folder_name, grown_decrypted_path_without_slash)\
-			APPEND_SLASH_IF_NECESSARY(grown_decrypted_path_without_slash, grown_decrypted_path)\
-			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(grown_decrypted_path, current_decrypted_path)\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(grown_decrypted_path_without_slash, next_decrypted_path_without_slash)\
 		}\
 		free(current_transformed_folder_name);\
-		APPEND_SLASH_IF_NECESSARY(next_root_directory_without_slash, next_root_directory)\
+		\
+		APPEND_SLASH_IF_NECESSARY_REPEATABLE(next_root_directory_without_slash, next_root_directory)\
 		free(next_root_directory_without_slash);\
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(next_root_directory, current_root_directory)\
+		free(next_root_directory);\
+		\
+		APPEND_SLASH_IF_NECESSARY_REPEATABLE(next_decrypted_path_without_slash, next_decrypted_path)\
+		free(next_decrypted_path_without_slash);\
+		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(next_decrypted_path, current_decrypted_path)\
+		free(next_decrypted_path);\
+		\
 		next_folder = strtok(NULL, "/");\
 	}\
 }\
