@@ -202,9 +202,15 @@ void start_encfs_for_directory(char *encrypted_directory){
 	//Start encfs for the correct folder.
 	//Get correct directory name
 	 if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
+		//Debug
+		printf("Calling start_encfs from start_encfs_for_directory.\n");
+		
 	 	start_encfs(encrypted_directory, DECRYPTED_DIRECTORY);
 	 } else {
 	 	GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_folder_name)
+		//Debug
+		printf("Calling start_encfs from start_encfs_for_directory.\n");
+		
 	 	start_encfs(encrypted_directory, decrypted_folder_name);
 	 }
 	
@@ -313,8 +319,6 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
-	//TODO: Create .password file, encrypted by the top folder process
-	
 	int return_value;
 	//Encfs will not take this way, it takes directly the way to the encrypted folder. So we have to do this in every case.
 	//Create new folder in decrypted directory
@@ -324,7 +328,13 @@ static int ecs_mkdir(const char *path, mode_t mode)
 	GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(path, path_to_new_encrypted_folder)
 	//Check, if folder already exists at that point. If not, wait.
 	while(access(path_to_new_encrypted_folder, F_OK) != 0);
+	if(path[0] == '/'){
+		path = path + sizeof(char) * 1;
+	}
 	LOCAL_STR_CAT(DECRYPTED_DIRECTORY, path, full_decrypted_path)
+	//Debug
+	printf("Calling start_encfs from ecs_mkdir.\n");
+	
 	start_encfs(path_to_new_encrypted_folder, full_decrypted_path);
 	
 	return return_value;

@@ -109,10 +109,11 @@ if(slash_needed){\
 	char not_const_path[strlen(MAYBE_CONST_PATH) + 1];\
 	strcpy(not_const_path, MAYBE_CONST_PATH);\
 	char *return_value;\
-	char *next_folder = strtok(not_const_path, "/");\
+	char *end_string;\
+	char *next_folder = strtok_r(not_const_path, "/", &end_string);\
 	while(next_folder != NULL && strlen(next_folder) > 0){\
 		return_value = next_folder;\
-		next_folder = strtok(NULL, "/");\
+		next_folder = strtok_r(NULL, "/", &end_string);\
 	}\
 	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(return_value, RESULT)\
 }

@@ -123,7 +123,8 @@ char *current_decrypted_path = NULL;\
 	/* Debug */ \
 	printf("relative_path: %s\n", relative_path);\
 	/* Get folder names */ \
-	char *next_folder = strtok(relative_path, "/");\
+	char *end_string;\
+	char *next_folder = strtok_r(relative_path, "/", &end_string);\
 	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
 	while(next_folder != NULL){\
 		printf("current_root_directory: %s\n", current_root_directory);\
@@ -166,7 +167,7 @@ char *current_decrypted_path = NULL;\
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(next_decrypted_path, current_decrypted_path)\
 		free(next_decrypted_path);\
 		\
-		next_folder = strtok(NULL, "/");\
+		next_folder = strtok_r(NULL, "/", &end_string);\
 	}\
 }\
 printf("current_root_directory: %s\n", current_root_directory);\
