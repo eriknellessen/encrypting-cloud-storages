@@ -69,19 +69,21 @@ VERIFY_PATH(path_and_password, PATH, RESULT)
 GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
 
 #define GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, DECRYPTED_PATH, RESULT) char *RESULT = NULL;\
-if(strcmp(PATH, ROOT_DIRECTORY) == 0){\
+{\
 	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
-	DECRYPT_DATA_AND_VERIFY_PATH(PATH, password_file, result)\
-	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
-} else {\
-	LOCAL_STR_CAT(DECRYPTED_PATH, "../", one_folder_above_decrypted_path)\
-	STRIP_UPPER_DIRECTORIES_AND_SLASH(PATH, stripped_path)\
-	LOCAL_STR_CAT(PASSWORD_FILE_NAME, stripped_path, password_file_with_stripped_path)\
-	free(stripped_path);\
-	LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)\
-	READ_FILE(password_path, path_with_password)\
-	VERIFY_PATH(path_with_password, PATH, result)\
-	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+	if(access(password_file, F_OK) == 0){\
+		DECRYPT_DATA_AND_VERIFY_PATH(PATH, password_file, result)\
+		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+	} else {\
+		LOCAL_STR_CAT(DECRYPTED_PATH, "../", one_folder_above_decrypted_path)\
+		STRIP_UPPER_DIRECTORIES_AND_SLASH(PATH, stripped_path)\
+		LOCAL_STR_CAT(PASSWORD_FILE_NAME, stripped_path, password_file_with_stripped_path)\
+		free(stripped_path);\
+		LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)\
+		READ_FILE(password_path, path_with_password)\
+		VERIFY_PATH(path_with_password, PATH, result)\
+		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+	}\
 }
 
 //encfsctl decode --extpass="echo password" ROOT_DIRECTORY DIRECTORY
