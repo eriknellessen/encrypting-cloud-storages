@@ -2,6 +2,7 @@
 #define GPG_OPERATIONS_H
 
 #include <gpgme.h>
+#include <unistd.h>
 #include "data_operations.h"
 
 #define ENCRYPT 0

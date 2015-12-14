@@ -8,7 +8,6 @@ char usage_string[] = "Usage: share_a_folder FOLDER OPENPGP_FINGERPRINT\n"
 /*
  * Input: A folder and a fingerprint of an OpenPGP key
  */
-//TODO: Let the user choose the decrypted folder name, not the encrypted one.
 int main(int argc, char *argv[])
 {
 	if(argc != 3){
