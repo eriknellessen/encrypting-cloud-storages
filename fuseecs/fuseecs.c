@@ -86,7 +86,7 @@ void create_encfs_directory(const char *encrypted_directory){
 	if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
 		//Debug
 		printf("In root directory, performing asymmetric encryption.\n");
-		
+
 		sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 	} else {
 		//Debug
@@ -179,6 +179,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	
 	//If there is no encrypted version of configuration file, create it.
 	//TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
+	//Maybe this problem only occurs when there are still encfs processes running.
 	if(access(encrypted_encfs_file, F_OK) != 0){
 		//Wait for encfs to create the file
 		while(get_file_size(path_with_encfs_file) == 0);

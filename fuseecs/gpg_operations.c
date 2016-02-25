@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 //gpg2 --sign --local-user A6506F46 --encrypt -r A6506F46 --output xxx.txt.gpg xxx.txt
+//TODO: By piping the data into gpg, the password is visible for other processes. Would be better to use GPGME here.
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
 	LOCAL_STR_CAT("echo \'", data, cmd0)
 	LOCAL_STR_CAT(cmd0, "\'", cmd1)

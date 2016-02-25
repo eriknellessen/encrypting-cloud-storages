@@ -72,7 +72,12 @@ GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
 #define GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, DECRYPTED_PATH, RESULT) char *RESULT = NULL;\
 {\
 	LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
-	if(access(password_file, F_OK) == 0){\
+	APPEND_SLASH_IF_NECESSARY(PATH, path_with_slash_at_the_end)\
+	LOCAL_STR_CAT(path_with_slash_at_the_end, password_file, path_with_password_prefix_and_fingerprint)\
+	LOCAL_STR_CAT(path_with_password_prefix_and_fingerprint, ENCRYPTED_FILE_ENDING, path_with_password_file)\
+	/* Debug */\
+	printf("In GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY. Trying to access the following file: %s\n", path_with_password_file);\
+	if(access(path_with_password_file, F_OK) == 0){\
 		DECRYPT_DATA_AND_VERIFY_PATH(PATH, password_file, result)\
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
 	} else {\
