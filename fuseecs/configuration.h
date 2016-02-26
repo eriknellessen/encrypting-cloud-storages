@@ -7,9 +7,9 @@
 #define ROOT_USER_ID 0
 //#define ENCFS_USER_ID 1001
 
-#define ROOT_DIRECTORY "/tmp/encrypted/"
-#define DECRYPTED_DIRECTORY "/tmp/decrypted/"
-#define MOUNTPOINT_DIRECTORY "/tmp/mountpoint/"
+#define ROOT_DIRECTORY "/home/destroyer/.ecs/encrypted/"
+#define DECRYPTED_DIRECTORY "/home/destroyer/.ecs/decrypted/"
+#define MOUNTPOINT_DIRECTORY "/home/destroyer/Dropbox/"
 #define ENCFS_CONFIGURATION_FILE ".encfs6.xml"
 #define ENCFS_COMMAND "encfs -o allow_other -v -d -s --stdinpass --standard "
 #define GPG_SIGN_COMMAND "gpg2 --sign --local-user "
@@ -21,7 +21,7 @@
 #define PATH_SEPARATOR 0x1F
 #define PATH_SEPARATOR_STRING {0x1F, 0}
 
-#define OWN_PUBLIC_KEY_FINGERPRINT "A6506F46"
+#define OWN_PUBLIC_KEY_FINGERPRINT "3BB86E8F"
 
 #define MAKEPASSWD_COMMAND "makepasswd --chars "
 #define PASSWORD_LENGTH_STRING "64"

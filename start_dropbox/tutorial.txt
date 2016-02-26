@@ -1,0 +1,11 @@
+1. Create user dropbox
+2. Install dropbox
+3. Grant user dropbox write access to your home directory, e.g. by executing chmod 777 ~
+4. Start dropbox (as user dropbox)
+5. Choose your home directory when asked where to place the Dropbox directory
+6. Remove the Dropbox/dropbox directory (i.e. the "dropbox" directory inside your "Dropbox" directory), which dropbox creates
+7. Terminate Dropbox
+8. Remove all files in Dropbox, e.g. by executing rm -rf * inside the Dropbox directory
+9. Start fuseecs (as normal user)
+10. Execute xhost + (as normal user)
+11. Start dropbox (as user dropbox)

@@ -55,10 +55,13 @@ long get_file_size(char *path){
 	return return_value;
 }
 
+//Creates empty encfs configuration file with the proper access rights. Creates random password and saves it in an encrypted file.
 void create_encfs_directory(const char *encrypted_directory){
 	//Debug
 	printf("create_encfs_directory called. encrypted_directory: %s\n", encrypted_directory);
 	
+	//TODO: On the virtual machine, encfs aborts, because it can not read the configuration file, if we do it like that.
+	/*
 	//Create configuration file with the right access rights (so Dropbox can not access it)
 	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_file)
 	LOCAL_STR_CAT("touch ", path_with_file, touch_cmd)
@@ -71,6 +74,7 @@ void create_encfs_directory(const char *encrypted_directory){
 		fprintf(stderr, "Could not chmod encfs configuration file.\n");
 		exit(-1);
 	}
+	*/
 	
 	//Create random password and encrypt it
 	GET_RANDOM_PASSWORD(password)
@@ -103,6 +107,9 @@ void create_encfs_directory(const char *encrypted_directory){
 		LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)
 		WRITE_FILE(password_path, plain_text)
 	}
+	
+	//Debug
+	printf("end of create_encfs_directory. encrypted_directory: %s\n", encrypted_directory);
 }
 
 void start_encfs(const char *encrypted_directory_maybe_without_slash, const char *mount_point_maybe_without_slash){
@@ -163,10 +170,12 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	//}
 	popen(concatenated_cmd, "r");
 	
-	//Debug
+	//Debug: Check if encfs changed our configuration file.
 	LOCAL_STR_CAT(path_with_encfs_file, ".old", path_with_old_encfs_file)
 	if(access(path_with_old_encfs_file, F_OK) == 0){
-		while(get_file_size(path_with_encfs_file) == 0);
+		//Debug: Because there are problems with encfs on the virtual machine, we do not create the file before and use the second version.
+		//while(get_file_size(path_with_encfs_file) == 0);
+		while(access(path_with_encfs_file, F_OK) != 0 || get_file_size(path_with_encfs_file) == 0);
 		LOCAL_STR_CAT("/bin/bash -c \"diff -u ", encrypted_directory, diff_cmd_without_file)
 		LOCAL_STR_CAT(diff_cmd_without_file, ENCFS_CONFIGURATION_FILE, diff_cmd_without_file_ending)
 		LOCAL_STR_CAT(diff_cmd_without_file_ending, "{,.old}", diff_cmd_without_ending_quotation_mark)
@@ -179,10 +188,12 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	
 	//If there is no encrypted version of configuration file, create it.
 	//TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
-	//Maybe this problem only occurs when there are still encfs processes running.
+	//Maybe this problem only occurs when there are still encfs processes running (noticed this once).
 	if(access(encrypted_encfs_file, F_OK) != 0){
 		//Wait for encfs to create the file
-		while(get_file_size(path_with_encfs_file) == 0);
+		//Debug: Because there are problems with encfs on the virtual machine, we do not create the file before and use the second version
+		//while(get_file_size(path_with_encfs_file) == 0);
+		while(access(path_with_encfs_file, F_OK) != 0 || get_file_size(path_with_encfs_file) == 0);
 		//Read file
 		READ_FILE(path_with_encfs_file, encfs_configuration_data)
 		printf("Read the following encfs configuration data from file: %s\n", encfs_configuration_data);
@@ -194,6 +205,9 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	
 	free(encrypted_directory);
 	free(mount_point);
+	
+	//Debug
+	printf("end of start_encfs. encrypted_directory: %s, mount_point: %s\n", encrypted_directory_maybe_without_slash, mount_point_maybe_without_slash);
 }
 
 void start_encfs_for_directory(char *encrypted_directory){
@@ -320,6 +334,7 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
+	//TODO: Differentiate between normal user and dropbox!
 	int return_value;
 	//Encfs will not take this way, it takes directly the way to the encrypted folder. So we have to do this in every case.
 	//Create new folder in decrypted directory
