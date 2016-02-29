@@ -69,6 +69,10 @@ void create_encfs_directory(const char *encrypted_directory){
 	printf("create_encfs_directory called. encrypted_directory: %s\n", encrypted_directory);
 	
 	//TODO: On the virtual machine, encfs aborts, because it can not read the configuration file, if we do it like that.
+	//This should be solved by the forbidden files list/virtual files. But Dropbox is still able to read the encfs file
+	//when reading the encrypted directory directly (not via the Dropbox folder). Is this a problem? It is not one, we
+	//have to solve, but we maybe can. Sandboxing Dropbox, so it can not read the encrypted folder, would be sufficient.
+	//chmod on the folder only is not sufficient, as it could still read files inside the folder.
 	/*
 	//Create configuration file with the right access rights (so Dropbox can not access it)
 	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_file)
@@ -286,7 +290,12 @@ void start_encfs_for_directory(char *encrypted_directory){
 			APPEND_SLASH_IF_NECESSARY(encrypted_directory, path)
 			LOCAL_STR_CAT(path, m_dirent->d_name, path_with_file)
 			printf("start_encfs_for_directory: examining file %s\n", path_with_file);
-			if(stat(path_with_file, &stbuf) == -1){
+			/* lstat is like stat, but does not try to resolve symbolic links.
+			 * Symbolic links can not be resolved at this point, because they
+			 * are still encrypted. See
+			 * http://pubs.opengroup.org/onlinepubs/009695399/functions/lstat.html
+			 */
+			if(lstat(path_with_file, &stbuf) == -1){
 				fprintf(stderr, "Unable to stat file: %s\n", path_with_file) ;
 				exit(-1);
 			}
@@ -353,7 +362,8 @@ enum Access_policy check_access(struct fuse_context *fc){
 int check_forbidden_files(const char *path){
 	int return_value = 0;
 	STRIP_UPPER_DIRECTORIES_AND_SLASH(path, file_name)
-	for(int i = 0; i < NUMBER_OF_FORBIDDEN_FILE_NAMES; i++){
+	int i;
+	for(i = 0; i < NUMBER_OF_FORBIDDEN_FILE_NAMES; i++){
 		if(!strcmp(file_name, Forbidden_file_names[i])){
 			return_value = -1;
 			break;
@@ -434,20 +444,27 @@ static int ecs_rmdir(const char *path)
 	CHANGE_PATH(xmp_rmdir(CONCATENATED_PATH))
 }
 
-//TODO: These three have to be treated in another way than CHANGE_PATH
+/* TODO: Symbolic linking only works when we are already in the Dropbox folder.
+ * ln -s Dropbox/dir_1 Dropbox/dir_3 leads to
+ * Dropbox/dir_3 -> /home/destroyer/.ecs/decrypted/Dropbox/dir_1 (the "Dropbox"
+ * should not exist between "decrypted" and "dir_1"). Besides, it would be
+ * better not to show the decrypted folder in the path, but the Dropbox folder.
+ * Dropbox does not upload our symbolic links. Maybe, because it cannot resolve
+ * them?
+ */
 static int ecs_symlink(const char *from, const char *to)
 {
-	return xmp_symlink(from, to);
+	CHANGE_BOTH_PATHS(xmp_symlink(CONCATENATED_FROM, CONCATENATED_TO))
 }
 
 static int ecs_rename(const char *from, const char *to)
 {
-	return xmp_rename(from, to);
+	CHANGE_BOTH_PATHS(xmp_rename(CONCATENATED_FROM, CONCATENATED_TO))
 }
 
 static int ecs_link(const char *from, const char *to)
 {
-	return xmp_link(from, to);
+	CHANGE_BOTH_PATHS(xmp_link(CONCATENATED_FROM, CONCATENATED_TO))
 }
 
 static int ecs_chmod(const char *path, mode_t mode)

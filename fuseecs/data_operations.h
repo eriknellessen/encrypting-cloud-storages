@@ -26,7 +26,26 @@ if(ap == USER){\
 	if(check_forbidden_files(path) == -1)\
 		return -1;\
 	else {\
-	GET_RETURN_VALUE(ROOT_DIRECTORY, FUNCTION_CALL)\
+		GET_RETURN_VALUE(ROOT_DIRECTORY, FUNCTION_CALL)\
+	}\
+}\
+return return_value;
+
+#define CONCATENATED_FROM concatenated_from
+#define CONCATENATED_TO concatenated_to
+#define GET_RETURN_VALUE_TWO_PATHS(START_OF_PATH, FUNCTION_CALL) LOCAL_STR_CAT(START_OF_PATH, from, CONCATENATED_FROM)\
+LOCAL_STR_CAT(START_OF_PATH, to, CONCATENATED_TO)\
+return_value = FUNCTION_CALL;
+#define CHANGE_BOTH_PATHS(FUNCTION_CALL) printf(#FUNCTION_CALL": From: %s To: %s\n", from, to);\
+enum Access_policy ap = check_access(fuse_get_context());\
+int return_value;\
+if(ap == USER){\
+	GET_RETURN_VALUE_TWO_PATHS(DECRYPTED_DIRECTORY, FUNCTION_CALL)\
+} else { \
+	if(check_forbidden_files(from) == -1 || check_forbidden_files(to) == -1)\
+		return -1;\
+	else {\
+		GET_RETURN_VALUE_TWO_PATHS(ROOT_DIRECTORY, FUNCTION_CALL)\
 	}\
 }\
 return return_value;
