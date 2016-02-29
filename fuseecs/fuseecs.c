@@ -41,12 +41,14 @@
 #include "data_operations.h"
 #include "gpg_operations.h"
 
-//TODO: Dropbox knows about the existence of these files, but cannot read them. We need to remove these files
-//from the lists, Dropbox gets from the list dir commands. Or we implement these files as virtual files.
 const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FILE_NAME, ENCFS_CONFIGURATION_FILE};
 
 /* General TODO: Dropbox does not do the synchronisation automatically anymore. We can make it by choosing
  * stop synchronisation and then start synchronisation.
+ */
+
+/* General TODO: From Dropbox's point of view, is it possible to do a path traversal attack? I.e. reading the folder
+ * Dropbox/../decrypted ? This would then be done with the user's privileges.
  */
 
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
@@ -388,10 +390,49 @@ static int ecs_readlink(const char *path, char *buf, size_t size)
 	CHANGE_PATH(xmp_readlink(CONCATENATED_PATH, buf, size))
 }
 
+static int ecs_revised_xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+		       off_t offset, struct fuse_file_info *fi, enum Access_policy ap)
+{
+	printf("%s %d\n", __FILE__, __LINE__);
+	DIR *dp;
+	struct dirent *de;
+
+	(void) offset;
+	(void) fi;
+
+	printf("%s %d\n", __FILE__, __LINE__);
+	
+	dp = opendir(path);
+	printf("%s %d\n", __FILE__, __LINE__);
+	if (dp == NULL)
+		return -errno;
+	printf("%s %d\n", __FILE__, __LINE__);
+	printf("%s %d\n", __FILE__, __LINE__);
+	printf("%s %d\n", __FILE__, __LINE__);
+	while ((de = readdir(dp)) != NULL) {
+		if(ap == USER || !check_forbidden_files(de->d_name)){
+			printf("%s %d\n", __FILE__, __LINE__);
+			struct stat st;
+			memset(&st, 0, sizeof(st));
+			st.st_ino = de->d_ino;
+			st.st_mode = de->d_type << 12;
+			printf("%s %d\n", __FILE__, __LINE__);
+			if (filler(buf, de->d_name, &st, 0))
+				break;
+			printf("%s %d\n", __FILE__, __LINE__);
+		}
+	}
+	printf("%s %d\n", __FILE__, __LINE__);
+
+	closedir(dp);
+	printf("%s %d\n", __FILE__, __LINE__);
+	return 0;
+}
+
 static int ecs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		       off_t offset, struct fuse_file_info *fi)
 {
-	CHANGE_PATH(xmp_readdir(CONCATENATED_PATH, buf, filler, offset, fi))
+	CHANGE_PATH(ecs_revised_xmp_readdir(CONCATENATED_PATH, buf, filler, offset, fi, check_access(fuse_get_context())))
 }
 
 static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
