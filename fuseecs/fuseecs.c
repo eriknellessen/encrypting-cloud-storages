@@ -41,6 +41,14 @@
 #include "data_operations.h"
 #include "gpg_operations.h"
 
+//TODO: Dropbox knows about the existence of these files, but cannot read them. We need to remove these files
+//from the lists, Dropbox gets from the list dir commands. Or we implement these files as virtual files.
+const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FILE_NAME, ENCFS_CONFIGURATION_FILE};
+
+/* General TODO: Dropbox does not do the synchronisation automatically anymore. We can make it by choosing
+ * stop synchronisation and then start synchronisation.
+ */
+
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
 
 long get_file_size(char *path){
@@ -155,6 +163,25 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	
 	//Start encfs process
 	//TODO: Giving the password in that form is not a good idea, as it is visible for everyone who can view processes via ps
+	//Did that TODO. New TODO: Dropbox can still access the .password file. That is the case, because it accesses the encrypted
+	//folder with our access rights. So to prevent Dropbox from reading the password file, we also need to change the read_file
+	//function.
+	//Create password file with the right access rights (so Dropbox can not access it)
+	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
+	LOCAL_STR_CAT("touch ", path_with_password_file, touch_cmd)
+	if(system(touch_cmd)){
+		fprintf(stderr, "Could not touch password file.\n");
+		exit(-1);
+	}
+	LOCAL_STR_CAT("chmod 600 ", path_with_password_file, chmod_cmd)
+	if(system(chmod_cmd)){
+		fprintf(stderr, "Could not chmod password file.\n");
+		exit(-1);
+	}
+	WRITE_FILE(path_with_password_file, password)
+	free(password);
+	
+	/*
 	LOCAL_STR_CAT("echo ", password, echo_password_string)
 	free(password);
 	LOCAL_STR_CAT(echo_password_string, " | ", echo_password_string_with_pipe)
@@ -169,6 +196,22 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	//	exit(-1);
 	//}
 	popen(concatenated_cmd, "r");
+	*/
+	
+	LOCAL_STR_CAT(ENCFS_COMMAND, CAT_COMMAND, cmd_without_password_file)
+	LOCAL_STR_CAT(cmd_without_password_file, path_with_password_file, cmd_with_password_file)
+	LOCAL_STR_CAT(cmd_with_password_file, "\" ", cmd_with_password_file_and_quotas)
+	LOCAL_STR_CAT(cmd_with_password_file_and_quotas, encrypted_directory, cmd_with_encrypted_directory)
+	LOCAL_STR_CAT(cmd_with_encrypted_directory, " ", cmd_with_encrypted_directory_and_space)
+	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
+	printf("before popen.\n");
+	printf("Executing the following command: %s\n", concatenated_cmd);
+	//if(system(concatenated_cmd)){
+	//	fprintf(stderr, "Error when executing encfs!\n");
+	//	exit(-1);
+	//}
+	popen(concatenated_cmd, "r");
+	//Endof Start encfs process
 	
 	//Debug: Check if encfs changed our configuration file.
 	LOCAL_STR_CAT(path_with_encfs_file, ".old", path_with_old_encfs_file)
@@ -238,7 +281,7 @@ void start_encfs_for_directory(char *encrypted_directory){
 	}
 	
 	while((m_dirent = readdir(m_dir)) != NULL){
-		if(strcmp(m_dirent->d_name, ".") && strcmp(m_dirent->d_name, "..")){
+		if(strcmp(m_dirent->d_name, ".") && strcmp(m_dirent->d_name, "..") && strcmp(m_dirent->d_name, DROPBOX_INTERNAL_FILES_DIRECTORY)){
 			struct stat stbuf;
 			APPEND_SLASH_IF_NECESSARY(encrypted_directory, path)
 			LOCAL_STR_CAT(path, m_dirent->d_name, path_with_file)
@@ -306,6 +349,20 @@ enum Access_policy check_access(struct fuse_context *fc){
 	return USER;
 }
 
+//Returns -1, if file name is in the list of forbidden file names
+int check_forbidden_files(const char *path){
+	int return_value = 0;
+	STRIP_UPPER_DIRECTORIES_AND_SLASH(path, file_name)
+	for(int i = 0; i < NUMBER_OF_FORBIDDEN_FILE_NAMES; i++){
+		if(!strcmp(file_name, Forbidden_file_names[i])){
+			return_value = -1;
+			break;
+		}
+	}
+	free(file_name);
+	return return_value;
+}
+
 static int ecs_getattr(const char *path, struct stat *stbuf)
 {
 	CHANGE_PATH(xmp_getattr(CONCATENATED_PATH, stbuf))
@@ -334,25 +391,36 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 
 static int ecs_mkdir(const char *path, mode_t mode)
 {
-	//TODO: Differentiate between normal user and dropbox!
 	int return_value;
-	//Encfs will not take this way, it takes directly the way to the encrypted folder. So we have to do this in every case.
-	//Create new folder in decrypted directory
-	GET_RETURN_VALUE(DECRYPTED_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
-	
-	//Now start encfs in the new encrypted folder, which encfs just created
-	GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(path, path_to_new_encrypted_folder)
-	//Check, if folder already exists at that point. If not, wait.
-	while(access(path_to_new_encrypted_folder, F_OK) != 0);
-	if(path[0] == '/'){
-		path = path + sizeof(char) * 1;
+	enum Access_policy ap = check_access(fuse_get_context());
+	if(ap == DROPBOX){
+		/* Case 1: Dropbox is trying to create a directory. Then we redirect to the encrypted folder.
+		* We do not have to start encfs in the newly created folder. */
+		if(path[0] == '/'){
+			path = path + sizeof(char) * 1;
+		}
+		GET_RETURN_VALUE(ROOT_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
+	} else {
+		/* Case 2: The user is trying to create a directory. Then we just write to the decrypted folder.
+		* Afterwards, we start encfs in the newly created folder. */
+		//Encfs will not take this way, it takes directly the way to the encrypted folder. So we have to do this in every case.
+		//Create new folder in decrypted directory
+		GET_RETURN_VALUE(DECRYPTED_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
+		
+		//Now start encfs in the new encrypted folder, which encfs just created
+		GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(path, path_to_new_encrypted_folder)
+		//Check, if folder already exists at that point. If not, wait.
+		while(access(path_to_new_encrypted_folder, F_OK) != 0);
+		if(path[0] == '/'){
+			path = path + sizeof(char) * 1;
+		}
+		LOCAL_STR_CAT(DECRYPTED_DIRECTORY, path, full_decrypted_path)
+		//Debug
+		printf("Calling start_encfs from ecs_mkdir.\n");
+		
+		start_encfs(path_to_new_encrypted_folder, full_decrypted_path);
 	}
-	LOCAL_STR_CAT(DECRYPTED_DIRECTORY, path, full_decrypted_path)
-	//Debug
-	printf("Calling start_encfs from ecs_mkdir.\n");
-	
-	start_encfs(path_to_new_encrypted_folder, full_decrypted_path);
-	
+
 	return return_value;
 }
 

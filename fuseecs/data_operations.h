@@ -4,6 +4,9 @@
 #include <string.h>
 #include "configuration.h"
 
+#define NUMBER_OF_FORBIDDEN_FILE_NAMES 2
+extern const char *Forbidden_file_names[];
+
 #define LOCAL_STR_CAT(START, END, RESULT) char RESULT[sizeof(char) * (strlen(START) + strlen(END) + 1)];\
 strcpy(RESULT, START);\
 strcat(RESULT, END);
@@ -20,7 +23,11 @@ int return_value;\
 if(ap == USER){\
 	GET_RETURN_VALUE(DECRYPTED_DIRECTORY, FUNCTION_CALL)\
 } else { \
+	if(check_forbidden_files(path) == -1)\
+		return -1;\
+	else {\
 	GET_RETURN_VALUE(ROOT_DIRECTORY, FUNCTION_CALL)\
+	}\
 }\
 return return_value;
 

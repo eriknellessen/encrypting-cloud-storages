@@ -11,7 +11,7 @@
 #define DECRYPTED_DIRECTORY "/home/destroyer/.ecs/decrypted/"
 #define MOUNTPOINT_DIRECTORY "/home/destroyer/Dropbox/"
 #define ENCFS_CONFIGURATION_FILE ".encfs6.xml"
-#define ENCFS_COMMAND "encfs -o allow_other -v -d -s --stdinpass --standard "
+#define ENCFS_COMMAND "encfs -o allow_other -v -d -s --standard --extpass=\""
 #define GPG_SIGN_COMMAND "gpg2 --sign --local-user "
 #define GPG_ENCRYPTION_OPTION " --encrypt -r "
 #define GPG_OUTPUT_OPTION " --output "
@@ -25,5 +25,9 @@
 
 #define MAKEPASSWD_COMMAND "makepasswd --chars "
 #define PASSWORD_LENGTH_STRING "64"
+
+#define CAT_COMMAND "cat "
+
+#define DROPBOX_INTERNAL_FILES_DIRECTORY ".dropbox.cache"
 
 #endif
