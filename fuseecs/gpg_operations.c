@@ -1,28 +1,63 @@
-#include "data_operations.h"
+#include "gpg_operations.h"
 #include <stdlib.h>
 #include <stdio.h>
 
 //gpg2 --sign --local-user A6506F46 --encrypt -r A6506F46 --output xxx.txt.gpg xxx.txt
 //TODO: By piping the data into gpg, the password is visible for other processes. Would be better to use GPGME here.
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
-	LOCAL_STR_CAT("echo \'", data, cmd0)
-	LOCAL_STR_CAT(cmd0, "\'", cmd1)
-	LOCAL_STR_CAT(cmd1, " | ", cmd2)
-	LOCAL_STR_CAT(cmd2, GPG_SIGN_COMMAND, cmd3)
-	LOCAL_STR_CAT(cmd3, OWN_PUBLIC_KEY_FINGERPRINT, cmd4)
-	LOCAL_STR_CAT(cmd4, GPG_ENCRYPTION_OPTION, cmd5)
-	LOCAL_STR_CAT(cmd5, public_key_fingerprint, cmd6)
-	LOCAL_STR_CAT(cmd6, GPG_OUTPUT_OPTION, cmd7)
-	LOCAL_STR_CAT(cmd7, path, cmd8)
-	LOCAL_STR_CAT(cmd8, file_name, cmd9)
-	LOCAL_STR_CAT(cmd9, public_key_fingerprint, cmd10)
-	LOCAL_STR_CAT(cmd10, ENCRYPTED_FILE_ENDING, concatenated_cmd)
-	
-	//Debug
-	printf("concatenated_cmd: %s\n", concatenated_cmd);
-	
-	if(system(concatenated_cmd)){
-		fprintf(stderr, "Could not sign and encrypt data.\n");
+	gpgme_ctx_t gpgme_ctx;
+	if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not create gpg context.\n");
 		exit(-1);
 	}
+
+	gpgme_key_t gpgme_recipient_key;
+	if(gpgme_get_key(gpgme_ctx, public_key_fingerprint, &gpgme_recipient_key, 0) != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not get the recipient key from GPGME.\n");
+		exit(-1);
+	}
+	gpgme_key_t gpgme_recipients[] = {gpgme_recipient_key, NULL};
+	
+	gpgme_key_t gpgme_signer_key;
+	if(gpgme_get_key(gpgme_ctx, OWN_PUBLIC_KEY_FINGERPRINT, &gpgme_signer_key, 0) != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not get the signer key from GPGME.\n");
+		exit(-1);
+	}
+	if(gpgme_signers_add(gpgme_ctx, gpgme_signer_key) != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not add own key to the signers list.\n");
+		exit(-1);
+	}
+
+	gpgme_data_t gpgme_plaintext_data;
+	if(gpgme_data_new_from_mem(&gpgme_plaintext_data, data, strlen(data), 0) != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not create GPGME data handle from given plaintext.\n");
+		exit(-1);
+	}
+
+	gpgme_data_t gpgme_encrypted_data;
+	if(gpgme_data_new(&gpgme_encrypted_data) != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not create GPGME data handle for encrypted data.\n");
+		exit(-1);
+	}
+
+	if(gpgme_op_encrypt_sign(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data) != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not encrypt and sign plaintext.\n");
+		exit(-1);
+	}
+	gpgme_signers_clear(gpgme_ctx);
+
+	//Get encrypted data
+	size_t encrypted_data_size;
+	char *encrypted_data = gpgme_data_release_and_get_mem(gpgme_encrypted_data, &encrypted_data_size);
+	
+	//Concatenate path
+	LOCAL_STR_CAT(path, file_name, path_with_file_name)
+	LOCAL_STR_CAT(path_with_file_name, public_key_fingerprint, path_with_file_name_and_public_key_fingerprint)
+	LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
+	
+	WRITE_BINARY_DATA_TO_FILE(concatenated_path, encrypted_data, encrypted_data_size)
+	
+	gpgme_free(encrypted_data);
+	gpgme_data_release(gpgme_plaintext_data);
+	gpgme_release(gpgme_ctx);
 } 

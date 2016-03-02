@@ -24,7 +24,7 @@ size_t length;\
 	}\
 	gpgme_data_t gpgme_decrypted_data;\
 	if(gpgme_data_new(&gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
-		fprintf(stderr, "Could not read encrypted data from file %s.\n", PATH);\
+		fprintf(stderr, "Could not create GPGME data handle for decrypted data.\n");\
 		exit(-1);\
 	}\
 	if(gpgme_op_decrypt_verify(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\

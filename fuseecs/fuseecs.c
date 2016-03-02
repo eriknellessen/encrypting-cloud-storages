@@ -119,7 +119,7 @@ void create_encfs_directory(const char *encrypted_directory){
 		LOCAL_STR_CAT(PASSWORD_FILE_NAME, stripped_path, password_file_with_stripped_path)
 		free(stripped_path);
 		LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)
-		WRITE_FILE(password_path, plain_text)
+		WRITE_STRING_TO_FILE(password_path, plain_text)
 	}
 	
 	//Debug
@@ -150,7 +150,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
 		printf("encfs configuration data after decryption: %s\n", encfs_configuration_data);
 		//Write data to file
-		WRITE_FILE(path_with_encfs_file, encfs_configuration_data)
+		WRITE_STRING_TO_FILE(path_with_encfs_file, encfs_configuration_data)
 		
 		//Debug
 		LOCAL_STR_CAT("/bin/bash -c \"cp ", encrypted_directory, cp_cmd_without_file)
@@ -168,10 +168,6 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	printf("password after decryption: %s\n", password);
 	
 	//Start encfs process
-	//TODO: Giving the password in that form is not a good idea, as it is visible for everyone who can view processes via ps
-	//Did that TODO. New TODO: Dropbox can still access the .password file. That is the case, because it accesses the encrypted
-	//folder with our access rights. So to prevent Dropbox from reading the password file, we also need to change the read_file
-	//function.
 	//Create password file with the right access rights (so Dropbox can not access it)
 	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
 	LOCAL_STR_CAT("touch ", path_with_password_file, touch_cmd)
@@ -184,25 +180,8 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		fprintf(stderr, "Could not chmod password file.\n");
 		exit(-1);
 	}
-	WRITE_FILE(path_with_password_file, password)
+	WRITE_STRING_TO_FILE(path_with_password_file, password)
 	free(password);
-	
-	/*
-	LOCAL_STR_CAT("echo ", password, echo_password_string)
-	free(password);
-	LOCAL_STR_CAT(echo_password_string, " | ", echo_password_string_with_pipe)
-	LOCAL_STR_CAT(echo_password_string_with_pipe, ENCFS_COMMAND, cmd_without_encrypted_directory)
-	LOCAL_STR_CAT(cmd_without_encrypted_directory, encrypted_directory, cmd_with_encrypted_directory)
-	LOCAL_STR_CAT(cmd_with_encrypted_directory, " ", cmd_with_encrypted_directory_and_space)
-	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
-	printf("before popen.\n");
-	printf("Executing the following command: %s\n", concatenated_cmd);
-	//if(system(concatenated_cmd)){
-	//	fprintf(stderr, "Error when executing encfs!\n");
-	//	exit(-1);
-	//}
-	popen(concatenated_cmd, "r");
-	*/
 	
 	LOCAL_STR_CAT(ENCFS_COMMAND, CAT_COMMAND, cmd_without_password_file)
 	LOCAL_STR_CAT(cmd_without_password_file, path_with_password_file, cmd_with_password_file)
@@ -391,41 +370,29 @@ static int ecs_readlink(const char *path, char *buf, size_t size)
 }
 
 static int ecs_revised_xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-		       off_t offset, struct fuse_file_info *fi, enum Access_policy ap)
+		off_t offset, struct fuse_file_info *fi, enum Access_policy ap)
 {
-	printf("%s %d\n", __FILE__, __LINE__);
 	DIR *dp;
 	struct dirent *de;
 
 	(void) offset;
 	(void) fi;
 
-	printf("%s %d\n", __FILE__, __LINE__);
-	
 	dp = opendir(path);
-	printf("%s %d\n", __FILE__, __LINE__);
 	if (dp == NULL)
 		return -errno;
-	printf("%s %d\n", __FILE__, __LINE__);
-	printf("%s %d\n", __FILE__, __LINE__);
-	printf("%s %d\n", __FILE__, __LINE__);
 	while ((de = readdir(dp)) != NULL) {
 		if(ap == USER || !check_forbidden_files(de->d_name)){
-			printf("%s %d\n", __FILE__, __LINE__);
 			struct stat st;
 			memset(&st, 0, sizeof(st));
 			st.st_ino = de->d_ino;
 			st.st_mode = de->d_type << 12;
-			printf("%s %d\n", __FILE__, __LINE__);
 			if (filler(buf, de->d_name, &st, 0))
 				break;
-			printf("%s %d\n", __FILE__, __LINE__);
 		}
 	}
-	printf("%s %d\n", __FILE__, __LINE__);
 
 	closedir(dp);
-	printf("%s %d\n", __FILE__, __LINE__);
 	return 0;
 }
 

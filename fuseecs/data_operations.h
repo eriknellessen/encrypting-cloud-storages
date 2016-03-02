@@ -7,6 +7,9 @@
 #define NUMBER_OF_FORBIDDEN_FILE_NAMES 2
 extern const char *Forbidden_file_names[];
 
+#define STRING 0
+#define BINARY 1
+
 #define LOCAL_STR_CAT(START, END, RESULT) char RESULT[sizeof(char) * (strlen(START) + strlen(END) + 1)];\
 strcpy(RESULT, START);\
 strcat(RESULT, END);
@@ -63,14 +66,30 @@ fread(RESULT, pos, 1, f);\
 RESULT[pos] = 0;\
 fclose(f);
 
-#define WRITE_FILE(PATH, DATA) {\
+#define WRITE_FILE(MODE, PATH, DATA, LENGTH) {\
 	FILE *f = fopen(PATH, "w");\
 	if(f == NULL){\
 		fprintf(stderr, "Could not read file %s (when trying to write to it).\n", PATH);\
 		exit(-1);\
 	}\
-	fputs(DATA, f);\
+	if(MODE == STRING)\
+		fputs(DATA, f);\
+	else {\
+		if(fwrite(DATA, 1, LENGTH, f) != LENGTH){\
+			fprintf(stderr, "Could not write data to file %s.\n", PATH);\
+			fclose(f);\
+			exit(-1);\
+		}\
+	}\
 	fclose(f);\
+}
+
+#define WRITE_STRING_TO_FILE(PATH, DATA) {\
+	WRITE_FILE(STRING, PATH, DATA, 0)\
+}
+
+#define WRITE_BINARY_DATA_TO_FILE(PATH, DATA, LENGTH) {\
+	WRITE_FILE(BINARY, PATH, DATA, LENGTH)\
 }
 
 #define SEPARATE_STRINGS(FIRST, SECOND, RESULT) char separator_string[] = PATH_SEPARATOR_STRING;\
