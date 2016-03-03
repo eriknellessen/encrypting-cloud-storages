@@ -43,7 +43,17 @@ int main(int argc, char *argv[])
 		SEPARATE_STRINGS(encrypted_folder, encfs_configuration_data, path_with_encfs_configuration_data)
 		sign_and_encrypt(path_with_encfs_configuration_data, fingerprint, encrypted_folder, ENCFS_CONFIGURATION_FILE);
 	}
+
+	//If encrypted_folder starts with the root directory, do not show the root directory to the user
+	char *encrypted_folder_to_show_to_user;
+	if(strncmp(ROOT_DIRECTORY, encrypted_folder, strlen(ROOT_DIRECTORY)) == 0){
+		encrypted_folder_to_show_to_user = encrypted_folder + strlen(ROOT_DIRECTORY);
+	} else {
+		encrypted_folder_to_show_to_user = encrypted_folder;
+	}
 	
+	printf("Enabled decryption of folder %s for key with fingerprint %s. Please share the following folder in your Dropbox: %s\n", decrypted_folder, fingerprint, encrypted_folder_to_show_to_user);
+
 	free(encrypted_folder);
 	return 0;
 }

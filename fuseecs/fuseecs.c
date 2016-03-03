@@ -45,10 +45,19 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
 
 /* General TODO: Dropbox does not do the synchronisation automatically anymore. We can make it by choosing
  * stop synchronisation and then start synchronisation.
+ * When we touch the file (as the dropbox user), e.g. touch Dropbox/9NY4zYsTpDh5hTS9644caqGa, Dropbox syncs
+ * it afterwards. Touching the file directly, i.e. touch .ecs/encrypted/9NY4zYsTpDh5hTS9644caqGa does not work.
+ * Even touching the file as the normal user, i.e. touch Dropbox/9NY4zYsTpDh5hTS9644caqGa works. Dropbox then
+ * syncs the file. Anyhow, this command creates a file with the plaintext name 9NY4zYsTpDh5hTS9644caqGa, i.e.
+ * a new encrypted file in .ecs/encrypted is created, which is not synced yet.
  */
 
 /* General TODO: From Dropbox's point of view, is it possible to do a path traversal attack? I.e. reading the folder
  * Dropbox/../decrypted ? This would then be done with the user's privileges.
+ */
+
+/* General TODO: Dropbox does not synchronize files in directories like Dropbox/dir_1/subdirectory/
+ * Even not after restarting Dropbox. Touching the subdirectory helps.
  */
 
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
@@ -74,7 +83,7 @@ void create_encfs_directory(const char *encrypted_directory){
 	//This should be solved by the forbidden files list/virtual files. But Dropbox is still able to read the encfs file
 	//when reading the encrypted directory directly (not via the Dropbox folder). Is this a problem? It is not one, we
 	//have to solve, but we maybe can. Sandboxing Dropbox, so it can not read the encrypted folder, would be sufficient.
-	//chmod on the folder only is not sufficient, as it could still read files inside the folder.
+	//chmod on the folder only is not sufficient, as it could still read files inside the folder. getfacl is does the job.
 	/*
 	//Create configuration file with the right access rights (so Dropbox can not access it)
 	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_file)
@@ -413,11 +422,19 @@ static int ecs_mkdir(const char *path, mode_t mode)
 	enum Access_policy ap = check_access(fuse_get_context());
 	if(ap == DROPBOX){
 		/* Case 1: Dropbox is trying to create a directory. Then we redirect to the encrypted folder.
-		* We do not have to start encfs in the newly created folder. */
+		* We have to start encfs in the newly created folder, if it is not the DROPBOX_INTERNAL_FILES_DIRECTORY. */
 		if(path[0] == '/'){
 			path = path + sizeof(char) * 1;
 		}
 		GET_RETURN_VALUE(ROOT_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
+		if(strcmp(path, DROPBOX_INTERNAL_FILES_DIRECTORY)){
+			printf("Calling start_encfs from ecs_mkdir.\n");
+
+			//TODO: Do this right. Is it possible to get the decrypted path name from the encrypted password file?
+			//No. But we could create an encrypted file with the encrypted and the decrypted name in it.
+			//Then, create the decrypted path in .ecs/decrypted/$(shared_folder_name) . Then call start_encfs.
+			start_encfs(path, full_decrypted_path);
+		}
 	} else {
 		/* Case 2: The user is trying to create a directory. Then we just write to the decrypted folder.
 		* Afterwards, we start encfs in the newly created folder. */

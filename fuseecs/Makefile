@@ -3,7 +3,7 @@ ENCRYPTED_DIRECTORY_ENCFS=/home/destroyer/.ecs/encrypted
 DECRYPTED_DIRECTORY_ENCFS=/home/destroyer/.ecs/decrypted
 
 all:
-	gcc -Wall fusexmp.c gpg_operations.c fuseecs.c `pkg-config fuse --cflags --libs` -lgpgme -o fuseecs
+	gcc -Wall fusexmp.c gpg_operations.c fuseecs.c `pkg-config fuse --cflags --libs` -lgpgme -o fuseecs -DHAVE_UTIMENSAT -DHAVE_SETXATTR
 
 clean:
 	rm -rf $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
