@@ -156,7 +156,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	//Decrypt data, check signature, check path
 	if(access(encrypted_encfs_file, F_OK) == 0){
 		LOCAL_STR_CAT(ENCFS_CONFIGURATION_FILE, OWN_PUBLIC_KEY_FINGERPRINT, encfs_configuration_file_with_fingerprint)
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_directory, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
 		printf("encfs configuration data after decryption: %s\n", encfs_configuration_data);
 		//Write data to file
 		WRITE_STRING_TO_FILE(path_with_encfs_file, encfs_configuration_data)
@@ -247,9 +247,86 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	printf("end of start_encfs. encrypted_directory: %s, mount_point: %s\n", encrypted_directory_maybe_without_slash, mount_point_maybe_without_slash);
 }
 
+//encrypted_directory should be full path.
+//Is called for encrypted_directory being a directory containing a DECRYPTED_FOLDER_NAME_FILE_NAME
+void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
+	/* 1. Get decrypted folder name from encrypted folder name file in the folder.
+	 * 2. Create that folder in the decrypted folder, if needed (encfs will create a corresponding folder in the encrypted folder)
+	 * 3. Get encrypted folder name
+	 * 4. Mark encrypted folder as not usable by placing a signed "do not use" file with the path in it.
+	 * 5. Start encfs with path for the encrypted directory and the decrypted path for the mountpoint
+	 */
+
+	STRIP_UPPER_DIRECTORIES_AND_SLASH(encrypted_directory, encrypted_folder_name_maybe_with_ending_slash)
+	REMOVE_SLASH_IF_NECESSARY_REPEATABLE(encrypted_folder_name_maybe_with_ending_slash, encrypted_folder_name)
+	free(encrypted_folder_name_maybe_with_ending_slash);
+	char *decrypted_folder_name = NULL;
+	{
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_folder_name, DECRYPTED_FOLDER_NAME_FILE_NAME, decrypted_folder_name_local)
+		free(encrypted_folder_name);
+		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_folder_name_local, decrypted_folder_name)
+	}
+
+	//Get decrypted folder name
+	//Strip last folder in path
+	//Get the decrypted path
+	//Append the decrypted folder name
+	REMOVE_LAST_FOLDER(encrypted_directory, path_without_last_folder)
+	char *decrypted_path_without_last_folder = NULL;
+	{
+		GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(path_without_last_folder, decrypted_path_without_last_folder_local)
+		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_path_without_last_folder_local, decrypted_path_without_last_folder)
+	}
+	
+	LOCAL_STR_CAT(decrypted_path_without_last_folder, decrypted_folder_name, decrypted_path)
+	free(decrypted_path_without_last_folder);
+	free(decrypted_folder_name);
+	//Debug
+	printf("decrypted path: %s\n", decrypted_path);
+	if(access(decrypted_path, F_OK) != 0){
+		if(xmp_mkdir(decrypted_path, mode)){
+			fprintf(stderr, "Could not create dir: %s\n", decrypted_path);
+			exit(-1);
+		}
+	}
+
+	GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(decrypted_path, encrypted_path)
+	//Wait for encfs to create the folder
+	while(access(encrypted_path, F_OK) != 0);
+
+	LOCAL_STR_CAT(encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, encrypted_path_with_file_name)
+	LOCAL_STR_CAT(encrypted_path_with_file_name, ENCRYPTED_FILE_ENDING, path_to_do_not_decrypt_file)
+	if(access(path_to_do_not_decrypt_file, F_OK) != 0){
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_path, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, result)
+	} else {
+		SEPARATE_STRINGS(encrypted_path, "", encrypted_path_with_separator)
+		sign_and_encrypt(encrypted_path_with_separator, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME);
+	}
+
+	start_encfs(encrypted_directory, decrypted_path);
+}
+
 void start_encfs_for_directory(char *encrypted_directory){
 	//Debug
 	printf("start_encfs_for_directory called. encrypted_directory: %s\n", encrypted_directory);
+	
+	/*TODO: Check, if folder contains a signed "do not use" file. */
+	LOCAL_STR_CAT(encrypted_directory, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, path_to_do_not_decrypt_file_without_file_ending)
+	LOCAL_STR_CAT(path_to_do_not_decrypt_file_without_file_ending, ENCRYPTED_FILE_ENDING, path_to_do_not_decrypt_file)
+	if(access(path_to_do_not_decrypt_file, F_OK) == 0){
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_directory, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, result)
+		return;
+	}
+	
+	/*TODO: Check, if folder contains a DECRYPTED_FOLDER_NAME_FILE_NAME file. If so, proceed in a different way */
+	LOCAL_STR_CAT(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME, path_to_decrypted_folder_name_file_without_file_ending)
+	LOCAL_STR_CAT(path_to_decrypted_folder_name_file_without_file_ending, ENCRYPTED_FILE_ENDING, path_to_decrypted_folder_name_file)
+	if(access(path_to_decrypted_folder_name_file, F_OK) == 0){
+		//TODO: start_encfs_for_shared_directory function call
+		//mode does not matter, decrypted directory should be created by now
+		start_encfs_for_shared_directory(encrypted_directory, 0);
+		return;
+	}
 	
 	//Start encfs for the correct folder.
 	//Get correct directory name
@@ -427,13 +504,16 @@ static int ecs_mkdir(const char *path, mode_t mode)
 			path = path + sizeof(char) * 1;
 		}
 		GET_RETURN_VALUE(ROOT_DIRECTORY, xmp_mkdir(CONCATENATED_PATH, mode))
+		if(return_value != 0){
+			fprintf(stderr, "Could not create dir: %s\n", CONCATENATED_PATH);
+			exit(-1);
+		}
 		if(strcmp(path, DROPBOX_INTERNAL_FILES_DIRECTORY)){
-			printf("Calling start_encfs from ecs_mkdir.\n");
-
-			//TODO: Do this right. Is it possible to get the decrypted path name from the encrypted password file?
-			//No. But we could create an encrypted file with the encrypted and the decrypted name in it.
-			//Then, create the decrypted path in .ecs/decrypted/$(shared_folder_name) . Then call start_encfs.
-			start_encfs(path, full_decrypted_path);
+			/* TODO: Return, so Dropbox continues and puts files in the folder.
+			 * Start a thread waiting for Dropbox to put the DECRYPTED_FOLDER_NAME_FILE_NAME
+			 * file in the folder. When the file was created, this thread shall start
+			 * the start_encfs_for_shared_directory function.
+			 */
 		}
 	} else {
 		/* Case 2: The user is trying to create a directory. Then we just write to the decrypted folder.

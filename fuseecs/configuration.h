@@ -30,4 +30,7 @@
 
 #define DROPBOX_INTERNAL_FILES_DIRECTORY ".dropbox.cache"
 
+#define DECRYPTED_FOLDER_NAME_FILE_NAME ".decrypted_folder_name"
+#define DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME ".do_not_decrypt_this_directory"
+
 #endif

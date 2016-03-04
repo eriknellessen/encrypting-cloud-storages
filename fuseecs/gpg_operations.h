@@ -44,7 +44,7 @@ if(memcpy(RESULT, plain_text, length) != RESULT){\
 RESULT[length - 1] = 0;\
 gpgme_free(plain_text);
 
-#define VERIFY_PATH(DATA, PATH, RESULT) size_t password_length;\
+#define VERIFY_PATH(DATA, PATH, RESULT) size_t data_length;\
 size_t end_of_path;\
 {\
 	char *end_of_path_string = strchr(DATA, PATH_SEPARATOR);\
@@ -53,18 +53,18 @@ size_t end_of_path;\
 	strncpy(path, DATA, end_of_path);\
 	path[end_of_path] = 0;\
 	if(strcmp(path, PATH)){\
-		fprintf(stderr, "Password for path %s in path %s.\n", PATH, path);\
+		fprintf(stderr, "Data for path %s in path %s.\n", PATH, path);\
 		exit(-1);\
 	}\
-	password_length = strlen(DATA - (end_of_path + 1));\
+	data_length = strlen(DATA - (end_of_path + 1));\
 }\
-char RESULT[password_length + 1];\
+char RESULT[data_length + 1];\
 strcpy(RESULT, DATA + end_of_path + 1);
 
-#define DECRYPT_DATA_AND_VERIFY_PATH(PATH, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH, FILE_NAME, path_without_file_ending)\
+#define DECRYPT_DATA_AND_VERIFY_PATH(PATH_TO_DIRECTORY, PATH_TO_VERIFY, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH_TO_DIRECTORY, FILE_NAME, path_without_file_ending)\
 LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
-DECRYPT_AND_VERIFY(path_with_file_ending, path_and_password)\
-VERIFY_PATH(path_and_password, PATH, RESULT)
+DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)\
+VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)
 
 #define GET_PASSWORD(PATH, RESULT) GET_FOLDER_NAME_ITERATIVELY(PATH, DECRYPT, decrypted_path)\
 GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
@@ -78,7 +78,7 @@ GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
 	/* Debug */\
 	printf("In GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY. Trying to access the following file: %s\n", path_with_password_file);\
 	if(access(path_with_password_file, F_OK) == 0){\
-		DECRYPT_DATA_AND_VERIFY_PATH(PATH, password_file, result)\
+		DECRYPT_DATA_AND_VERIFY_PATH(PATH, PATH, password_file, result)\
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
 	} else {\
 		LOCAL_STR_CAT(DECRYPTED_PATH, "../", one_folder_above_decrypted_path)\

@@ -44,6 +44,20 @@ int main(int argc, char *argv[])
 		sign_and_encrypt(path_with_encfs_configuration_data, fingerprint, encrypted_folder, ENCFS_CONFIGURATION_FILE);
 	}
 
+	/* TODO: Create encrypted and signed folder name file (with the decrypted folder name in it.) */
+	{
+		STRIP_UPPER_DIRECTORIES_AND_SLASH(decrypted_folder, plain_folder_name_maybe_with_ending_slash)
+		REMOVE_SLASH_IF_NECESSARY_REPEATABLE(plain_folder_name_maybe_with_ending_slash, plain_folder_name)
+		free(plain_folder_name_maybe_with_ending_slash);
+		STRIP_UPPER_DIRECTORIES_AND_SLASH(encrypted_folder, encrypted_folder_name_maybe_with_ending_slash)
+		REMOVE_SLASH_IF_NECESSARY_REPEATABLE(encrypted_folder_name_maybe_with_ending_slash, encrypted_folder_name)
+		free(encrypted_folder_name_maybe_with_ending_slash);
+		SEPARATE_STRINGS(encrypted_folder_name, plain_folder_name, encrypted_and_decrypted_folder_name)
+		free(plain_folder_name);
+		free(encrypted_folder_name);
+		sign_and_encrypt(encrypted_and_decrypted_folder_name, fingerprint, encrypted_folder, DECRYPTED_FOLDER_NAME_FILE_NAME);
+	}
+
 	//If encrypted_folder starts with the root directory, do not show the root directory to the user
 	char *encrypted_folder_to_show_to_user;
 	if(strncmp(ROOT_DIRECTORY, encrypted_folder, strlen(ROOT_DIRECTORY)) == 0){

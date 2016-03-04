@@ -163,4 +163,28 @@ if(slash_needed){\
 	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(return_value, RESULT)\
 }
 
+#define REMOVE_SLASH_IF_NECESSARY(STRING, RESULT) int remove_slash = 0;\
+if(STRING[strlen(STRING) - 1] == '/'){\
+	remove_slash = 1;\
+}\
+char RESULT[strlen(STRING) + 1 - remove_slash];\
+if(remove_slash){\
+	strncpy(RESULT, STRING, strlen(STRING) - 1);\
+} else {\
+	strcpy(RESULT, STRING);\
+}
+
+#define REMOVE_SLASH_IF_NECESSARY_REPEATABLE(STRING, RESULT) char *RESULT = NULL;\
+{\
+	REMOVE_SLASH_IF_NECESSARY(STRING, result)\
+	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+}
+
+#define REMOVE_LAST_FOLDER(PATH, RESULT) REMOVE_SLASH_IF_NECESSARY(PATH, path_without_ending_slash)\
+char *end_of_result = strrchr(path_without_ending_slash, '/');\
+int length_of_result = end_of_result - PATH + 1;\
+char RESULT[length_of_result];\
+strncpy(RESULT, PATH, length_of_result - 1);\
+RESULT[length_of_result - 1] = 0;
+
 #endif
