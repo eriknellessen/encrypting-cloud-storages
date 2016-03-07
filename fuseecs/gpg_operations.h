@@ -35,13 +35,18 @@ size_t length;\
 	gpgme_release(gpgme_ctx);\
 	\
 	plain_text = gpgme_data_release_and_get_mem(gpgme_decrypted_data, &length);\
+	/* Debug */\
+	printf("plaintext length: %i\n", length);\
 }\
-char RESULT[length];\
+/* Reserve one additional byte for the ending 0 byte */\
+char RESULT[length + 1];\
 if(memcpy(RESULT, plain_text, length) != RESULT){\
 	fprintf(stderr, "Could not copy decrypted data.\n");\
 	exit(-1);\
 }\
-RESULT[length - 1] = 0;\
+RESULT[length] = 0;\
+/* Debug */\
+printf("plaintext result: %s\n", RESULT);\
 gpgme_free(plain_text);
 
 #define VERIFY_PATH(DATA, PATH, RESULT) size_t data_length;\
@@ -66,6 +71,14 @@ LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_en
 DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)\
 VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)
 
+#define SET_PATH_TO_COMPARE_TO(PATH, RESULT)char *RESULT = NULL;\
+	STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(PATH, directory_name)\
+	if(directory_contains_authentic_file(PATH, DECRYPTED_FOLDER_NAME_FILE_NAME)){\
+		RESULT = directory_name;\
+	} else {\
+		RESULT = PATH;\
+	}
+
 #define GET_PASSWORD(PATH, RESULT) GET_FOLDER_NAME_ITERATIVELY(PATH, DECRYPT, decrypted_path)\
 GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
 
@@ -78,7 +91,8 @@ GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
 	/* Debug */\
 	printf("In GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY. Trying to access the following file: %s\n", path_with_password_file);\
 	if(access(path_with_password_file, F_OK) == 0){\
-		DECRYPT_DATA_AND_VERIFY_PATH(PATH, PATH, password_file, result)\
+		SET_PATH_TO_COMPARE_TO(PATH, path_to_compare_to)\
+		DECRYPT_DATA_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)\
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
 	} else {\
 		LOCAL_STR_CAT(DECRYPTED_PATH, "../", one_folder_above_decrypted_path)\
@@ -198,8 +212,12 @@ free(current_decrypted_path);
 #define GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(DIRECTORY, RESULT) GET_FOLDER_NAME_ITERATIVELY(DIRECTORY, DECRYPT, RESULT)
 
 #define GET_RANDOM_PASSWORD(RESULT) LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
-RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
+	RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)\
+	RESULT[PASSWORD_LENGTH] = 0;\
+	/* Debug */\
+	printf("Got the following random password: %s\n", RESULT);
 
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
+int directory_contains_authentic_file(char *encrypted_directory, char *file_name);
 
 #endif

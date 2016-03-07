@@ -156,7 +156,14 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	//Decrypt data, check signature, check path
 	if(access(encrypted_encfs_file, F_OK) == 0){
 		LOCAL_STR_CAT(ENCFS_CONFIGURATION_FILE, OWN_PUBLIC_KEY_FINGERPRINT, encfs_configuration_file_with_fingerprint)
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_directory, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
+		char *path_to_compare_to = NULL;
+		STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_directory, encrypted_directory_name)
+		if(directory_contains_authentic_file(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME)){
+			path_to_compare_to = encrypted_directory_name;
+		} else {
+			path_to_compare_to = encrypted_directory;
+		}
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, path_to_compare_to, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
 		printf("encfs configuration data after decryption: %s\n", encfs_configuration_data);
 		//Write data to file
 		WRITE_STRING_TO_FILE(path_with_encfs_file, encfs_configuration_data)
@@ -250,34 +257,47 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 //encrypted_directory should be full path.
 //Is called for encrypted_directory being a directory containing a DECRYPTED_FOLDER_NAME_FILE_NAME
 void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
+	//Debug
+	printf("start_encfs_for_shared_directory started. encrypted_directory: %s\n", encrypted_directory);
+
 	/* 1. Get decrypted folder name from encrypted folder name file in the folder.
 	 * 2. Create that folder in the decrypted folder, if needed (encfs will create a corresponding folder in the encrypted folder)
 	 * 3. Get encrypted folder name
 	 * 4. Mark encrypted folder as not usable by placing a signed "do not use" file with the path in it.
 	 * 5. Start encfs with path for the encrypted directory and the decrypted path for the mountpoint
 	 */
-
-	STRIP_UPPER_DIRECTORIES_AND_SLASH(encrypted_directory, encrypted_folder_name_maybe_with_ending_slash)
-	REMOVE_SLASH_IF_NECESSARY_REPEATABLE(encrypted_folder_name_maybe_with_ending_slash, encrypted_folder_name)
-	free(encrypted_folder_name_maybe_with_ending_slash);
+	
+	char *encrypted_folder_name = NULL;
+	{
+		STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_directory, encrypted_folder_name_local)
+		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(encrypted_folder_name_local, encrypted_folder_name)
+	}
 	char *decrypted_folder_name = NULL;
 	{
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_folder_name, DECRYPTED_FOLDER_NAME_FILE_NAME, decrypted_folder_name_local)
+		LOCAL_STR_CAT(DECRYPTED_FOLDER_NAME_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, decrypted_folder_name_file_with_fingerprint)
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_folder_name, decrypted_folder_name_file_with_fingerprint, decrypted_folder_name_local)
+		//Debug
+		printf("decrypted_folder_name_local: %s\n", decrypted_folder_name_local);
 		free(encrypted_folder_name);
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_folder_name_local, decrypted_folder_name)
 	}
+	//Debug
+	printf("Step 1 completed. decrypted_folder_name: %s\n", decrypted_folder_name);
 
+	printf("Step 2.1\n");
 	//Get decrypted folder name
 	//Strip last folder in path
 	//Get the decrypted path
 	//Append the decrypted folder name
 	REMOVE_LAST_FOLDER(encrypted_directory, path_without_last_folder)
+	printf("Step 2.2\n");
 	char *decrypted_path_without_last_folder = NULL;
 	{
-		GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(path_without_last_folder, decrypted_path_without_last_folder_local)
+		APPEND_SLASH_IF_NECESSARY(path_without_last_folder, path_without_last_folder_ending_on_slash)
+		GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(path_without_last_folder_ending_on_slash, decrypted_path_without_last_folder_local)
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_path_without_last_folder_local, decrypted_path_without_last_folder)
 	}
-	
+	printf("Step 2.3\n");
 	LOCAL_STR_CAT(decrypted_path_without_last_folder, decrypted_folder_name, decrypted_path)
 	free(decrypted_path_without_last_folder);
 	free(decrypted_folder_name);
@@ -289,44 +309,52 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 			exit(-1);
 		}
 	}
+	//Debug
+	printf("Step 2 completed. decrypted_path: %s\n", decrypted_path);
 
 	GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(decrypted_path, encrypted_path)
+	//Debug
+	printf("Step 3.1. encrypted_path: %s\n", encrypted_path);
 	//Wait for encfs to create the folder
 	while(access(encrypted_path, F_OK) != 0);
+	//Debug
+	printf("Step 3 completed. encrypted_path: %s\n", encrypted_path);
 
-	LOCAL_STR_CAT(encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, encrypted_path_with_file_name)
+	LOCAL_STR_CAT(DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, do_not_decrypt_file_name_with_fingerprint)
+	LOCAL_STR_CAT(encrypted_path, do_not_decrypt_file_name_with_fingerprint, encrypted_path_with_file_name)
 	LOCAL_STR_CAT(encrypted_path_with_file_name, ENCRYPTED_FILE_ENDING, path_to_do_not_decrypt_file)
-	if(access(path_to_do_not_decrypt_file, F_OK) != 0){
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_path, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, result)
+	if(access(path_to_do_not_decrypt_file, F_OK) == 0){
+		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_path, encrypted_path, do_not_decrypt_file_name_with_fingerprint, result)
 	} else {
 		SEPARATE_STRINGS(encrypted_path, "", encrypted_path_with_separator)
 		sign_and_encrypt(encrypted_path_with_separator, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME);
 	}
+	//Debug
+	printf("Step 4 completed.\n");
 
 	start_encfs(encrypted_directory, decrypted_path);
+	//Debug
+	printf("Step 5 completed.\n");
+	//Debug
+	printf("start_encfs_for_shared_directory ended. encrypted_directory: %s\n", encrypted_directory);
 }
 
-void start_encfs_for_directory(char *encrypted_directory){
+void start_encfs_for_directory(char *encrypted_directory_maybe_without_slash){
+	APPEND_SLASH_IF_NECESSARY(encrypted_directory_maybe_without_slash, encrypted_directory)
 	//Debug
 	printf("start_encfs_for_directory called. encrypted_directory: %s\n", encrypted_directory);
 	
-	/*TODO: Check, if folder contains a signed "do not use" file. */
-	LOCAL_STR_CAT(encrypted_directory, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, path_to_do_not_decrypt_file_without_file_ending)
-	LOCAL_STR_CAT(path_to_do_not_decrypt_file_without_file_ending, ENCRYPTED_FILE_ENDING, path_to_do_not_decrypt_file)
-	if(access(path_to_do_not_decrypt_file, F_OK) == 0){
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_directory, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, result)
+	if(directory_contains_authentic_file(encrypted_directory, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME)){
 		return;
 	}
 	
-	/*TODO: Check, if folder contains a DECRYPTED_FOLDER_NAME_FILE_NAME file. If so, proceed in a different way */
-	LOCAL_STR_CAT(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME, path_to_decrypted_folder_name_file_without_file_ending)
-	LOCAL_STR_CAT(path_to_decrypted_folder_name_file_without_file_ending, ENCRYPTED_FILE_ENDING, path_to_decrypted_folder_name_file)
-	if(access(path_to_decrypted_folder_name_file, F_OK) == 0){
-		//TODO: start_encfs_for_shared_directory function call
+	if(directory_contains_authentic_file(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME)){
 		//mode does not matter, decrypted directory should be created by now
-		start_encfs_for_shared_directory(encrypted_directory, 0);
+		start_encfs_for_shared_directory(encrypted_directory, 0744);
 		return;
 	}
+	//Debug
+	printf("start_encfs_for_directory: encrypted_directory %s is not a shared folder.\n", encrypted_directory);
 	
 	//Start encfs for the correct folder.
 	//Get correct directory name

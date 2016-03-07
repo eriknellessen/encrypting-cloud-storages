@@ -180,11 +180,23 @@ if(remove_slash){\
 	PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
 }
 
+#define STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(PATH, RESULT) STRIP_UPPER_DIRECTORIES_AND_SLASH(PATH, folder_name_maybe_with_ending_slash)\
+	REMOVE_SLASH_IF_NECESSARY(folder_name_maybe_with_ending_slash, RESULT)\
+	free(folder_name_maybe_with_ending_slash);
+
 #define REMOVE_LAST_FOLDER(PATH, RESULT) REMOVE_SLASH_IF_NECESSARY(PATH, path_without_ending_slash)\
-char *end_of_result = strrchr(path_without_ending_slash, '/');\
-int length_of_result = end_of_result - PATH + 1;\
-char RESULT[length_of_result];\
-strncpy(RESULT, PATH, length_of_result - 1);\
-RESULT[length_of_result - 1] = 0;
+	/* Debug */\
+	printf("REMOVE_LAST_FOLDER step 1.\n");\
+	char *end_of_result = strrchr(path_without_ending_slash, '/');\
+	int length_of_result = end_of_result - path_without_ending_slash + 1;\
+	char RESULT[length_of_result];\
+	/* Debug */\
+	printf("REMOVE_LAST_FOLDER step 2.\n");\
+	strncpy(RESULT, path_without_ending_slash, length_of_result - 1);\
+	/* Debug */\
+	printf("REMOVE_LAST_FOLDER step 3.\n");\
+	RESULT[length_of_result - 1] = 0;\
+	/* Debug */\
+	printf("REMOVE_LAST_FOLDER step 4.\n");\
 
 #endif

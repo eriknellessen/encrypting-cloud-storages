@@ -24,6 +24,7 @@
 #define OWN_PUBLIC_KEY_FINGERPRINT "3BB86E8F"
 
 #define MAKEPASSWD_COMMAND "makepasswd --chars "
+#define PASSWORD_LENGTH 64
 #define PASSWORD_LENGTH_STRING "64"
 
 #define CAT_COMMAND "cat "
