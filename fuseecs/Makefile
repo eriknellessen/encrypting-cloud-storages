@@ -1,9 +1,10 @@
-MOUNTPOINT=/home/destroyer/Dropbox
-ENCRYPTED_DIRECTORY_ENCFS=/home/destroyer/.ecs/encrypted
-DECRYPTED_DIRECTORY_ENCFS=/home/destroyer/.ecs/decrypted
+#These values are filled in by configuration.sh
+MOUNTPOINT=
+ENCRYPTED_DIRECTORY_ENCFS=
+DECRYPTED_DIRECTORY_ENCFS=
 
 all:
-	gcc -Wall fusexmp.c gpg_operations.c fuseecs.c `pkg-config fuse --cflags --libs` -lgpgme -o fuseecs -DHAVE_UTIMENSAT -DHAVE_SETXATTR
+	gcc -Wall fusexmp.c gpg_operations.c fuseecs.c `pkg-config fuse --cflags --libs` -lgpgme -pthread -o fuseecs -DHAVE_UTIMENSAT -DHAVE_SETXATTR
 
 clean:
 	rm -rf $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
@@ -17,10 +18,10 @@ create_mountpoint:
 	chmod 777 $(MOUNTPOINT)
 
 start: preparations
-	./fuseecs -o allow_other -o debug $(MOUNTPOINT)
+	./fuseecs -o allow_other $(MOUNTPOINT)
 
 start_foreground: preparations
-	./fuseecs -f -o allow_other -o debug $(MOUNTPOINT)
+	./fuseecs -f -o allow_other $(MOUNTPOINT)
 	
 stop:
 	fusermount -u $(MOUNTPOINT)

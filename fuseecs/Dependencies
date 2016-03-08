@@ -2,3 +2,4 @@ fuse
 gpg2
 makepasswd
 gpgme
+pthreads

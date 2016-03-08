@@ -1,17 +1,23 @@
 #ifndef CONFIGURATION_H
 #define CONFIGURATION_H
 
+//Values, that really are changed from user to user (and are filled by configuration.sh)
+#define ACCESS_USER_ID 
+
+#define ROOT_DIRECTORY ""
+#define DECRYPTED_DIRECTORY ""
+#define MOUNTPOINT_DIRECTORY ""
+
+#define OWN_PUBLIC_KEY_FINGERPRINT ""
+
+//Values, that usually stay like this
 #define BUFFER_SIZE 1024
 
-#define ACCESS_USER_ID 1000
 #define ROOT_USER_ID 0
 //#define ENCFS_USER_ID 1001
 
-#define ROOT_DIRECTORY "/home/destroyer/.ecs/encrypted/"
-#define DECRYPTED_DIRECTORY "/home/destroyer/.ecs/decrypted/"
-#define MOUNTPOINT_DIRECTORY "/home/destroyer/Dropbox/"
 #define ENCFS_CONFIGURATION_FILE ".encfs6.xml"
-#define ENCFS_COMMAND "encfs -o allow_other -v -d -s --standard --extpass=\""
+#define ENCFS_COMMAND "encfs -o allow_other -s --standard --extpass=\""
 #define GPG_SIGN_COMMAND "gpg2 --sign --local-user "
 #define GPG_ENCRYPTION_OPTION " --encrypt -r "
 #define GPG_OUTPUT_OPTION " --output "
@@ -20,8 +26,6 @@
 #define PASSWORD_FILE_NAME ".password"
 #define PATH_SEPARATOR 0x1F
 #define PATH_SEPARATOR_STRING {0x1F, 0}
-
-#define OWN_PUBLIC_KEY_FINGERPRINT "3BB86E8F"
 
 #define MAKEPASSWD_COMMAND "makepasswd --chars "
 #define PASSWORD_LENGTH 64

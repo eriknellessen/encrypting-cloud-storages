@@ -36,6 +36,8 @@
 #include "fusexmp.h"
 #include <stdlib.h>
 #include <gpgme.h>
+#include <pthread.h>
+#include <sched.h>
 
 #include "configuration.h"
 #include "data_operations.h"
@@ -60,9 +62,11 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
  * Even not after restarting Dropbox. Touching the subdirectory helps.
  */
 
+/* General TODO: The encfs processes are no longer killed with our program. Find out, why, and fix this. */
+
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
 
-long get_file_size(char *path){
+long get_file_size(const char *path){
 	FILE *f = fopen(path, "r");
 	if(f == NULL){
 		fprintf(stderr, "Could not read file %s (when trying to get size).\n", path);
@@ -72,6 +76,16 @@ long get_file_size(char *path){
 	long return_value = ftell(f);
 	fclose(f);
 	return return_value;
+}
+
+void wait_until_file_is_created_and_has_content(const char *path){
+	while(access(path, F_OK) != 0 || get_file_size(path) == 0){
+		if(sched_yield()){
+			fprintf(stderr, "pthread_yield returned error.\n");
+			exit(-1);
+		}
+	}
+	return;
 }
 
 //Creates empty encfs configuration file with the proper access rights. Creates random password and saves it in an encrypted file.
@@ -219,7 +233,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	if(access(path_with_old_encfs_file, F_OK) == 0){
 		//Debug: Because there are problems with encfs on the virtual machine, we do not create the file before and use the second version.
 		//while(get_file_size(path_with_encfs_file) == 0);
-		while(access(path_with_encfs_file, F_OK) != 0 || get_file_size(path_with_encfs_file) == 0);
+		wait_until_file_is_created_and_has_content(path_with_encfs_file);
 		LOCAL_STR_CAT("/bin/bash -c \"diff -u ", encrypted_directory, diff_cmd_without_file)
 		LOCAL_STR_CAT(diff_cmd_without_file, ENCFS_CONFIGURATION_FILE, diff_cmd_without_file_ending)
 		LOCAL_STR_CAT(diff_cmd_without_file_ending, "{,.old}", diff_cmd_without_ending_quotation_mark)
@@ -237,7 +251,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		//Wait for encfs to create the file
 		//Debug: Because there are problems with encfs on the virtual machine, we do not create the file before and use the second version
 		//while(get_file_size(path_with_encfs_file) == 0);
-		while(access(path_with_encfs_file, F_OK) != 0 || get_file_size(path_with_encfs_file) == 0);
+		wait_until_file_is_created_and_has_content(path_with_encfs_file);
 		//Read file
 		READ_FILE(path_with_encfs_file, encfs_configuration_data)
 		printf("Read the following encfs configuration data from file: %s\n", encfs_configuration_data);
@@ -316,7 +330,7 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 	//Debug
 	printf("Step 3.1. encrypted_path: %s\n", encrypted_path);
 	//Wait for encfs to create the folder
-	while(access(encrypted_path, F_OK) != 0);
+	wait_until_file_is_created_and_has_content(encrypted_path);
 	//Debug
 	printf("Step 3 completed. encrypted_path: %s\n", encrypted_path);
 
@@ -521,6 +535,28 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 	CHANGE_PATH(xmp_mknod(CONCATENATED_PATH, mode, rdev))
 }
 
+//TODO: How can we make sure, that the started encfs is killed when we kill the process?
+static void *wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory(void *relative_encrypted_directory_maybe_without_slash_void_pointer)
+{
+	printf("New thread created (we are in function wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory now).\n");
+	char *relative_encrypted_directory_maybe_without_slash = (char *) relative_encrypted_directory_maybe_without_slash_void_pointer;
+	APPEND_SLASH_IF_NECESSARY(relative_encrypted_directory_maybe_without_slash, relative_encrypted_directory)
+	LOCAL_STR_CAT(ROOT_DIRECTORY, relative_encrypted_directory, encrypted_directory)
+	LOCAL_STR_CAT(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME, encrypted_directory_without_fingerprint)
+	LOCAL_STR_CAT(encrypted_directory_without_fingerprint, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory_without_file_ending)
+	LOCAL_STR_CAT(encrypted_directory_without_file_ending, ENCRYPTED_FILE_ENDING, encrypted_directory_with_file_name)
+	//TODO: Should we also wait, until Dropbox has completed writing to the file?
+	printf("Will wait for file: %s\n", encrypted_directory_with_file_name);
+	wait_until_file_is_created_and_has_content(encrypted_directory_with_file_name);
+	printf("The following file has been created: %s\n", encrypted_directory_with_file_name);
+	printf("Will call start_encfs_for_shared_directory.\n");
+	start_encfs_for_shared_directory(encrypted_directory, 0744);
+
+	free(relative_encrypted_directory_maybe_without_slash_void_pointer);
+	printf("End of wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory.\n");
+	return NULL;
+}
+
 static int ecs_mkdir(const char *path, mode_t mode)
 {
 	int return_value;
@@ -536,12 +572,22 @@ static int ecs_mkdir(const char *path, mode_t mode)
 			fprintf(stderr, "Could not create dir: %s\n", CONCATENATED_PATH);
 			exit(-1);
 		}
-		if(strcmp(path, DROPBOX_INTERNAL_FILES_DIRECTORY)){
+
+		if(strncmp(path, DROPBOX_INTERNAL_FILES_DIRECTORY, strlen(DROPBOX_INTERNAL_FILES_DIRECTORY)) != 0){
 			/* TODO: Return, so Dropbox continues and puts files in the folder.
 			 * Start a thread waiting for Dropbox to put the DECRYPTED_FOLDER_NAME_FILE_NAME
 			 * file in the folder. When the file was created, this thread shall start
 			 * the start_encfs_for_shared_directory function.
 			 */
+
+			char *not_const_path = malloc(sizeof(char) * (strlen(path) + 1));
+			strcpy(not_const_path, path);
+			//Not needed, just for compiler
+			pthread_t thread;
+			
+			//Debug
+			printf("Calling wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory.\n");
+			pthread_create(&thread, NULL, wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory, not_const_path);
 		}
 	} else {
 		/* Case 2: The user is trying to create a directory. Then we just write to the decrypted folder.
@@ -553,7 +599,7 @@ static int ecs_mkdir(const char *path, mode_t mode)
 		//Now start encfs in the new encrypted folder, which encfs just created
 		GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(path, path_to_new_encrypted_folder)
 		//Check, if folder already exists at that point. If not, wait.
-		while(access(path_to_new_encrypted_folder, F_OK) != 0);
+		wait_until_file_is_created_and_has_content(path_to_new_encrypted_folder);
 		if(path[0] == '/'){
 			path = path + sizeof(char) * 1;
 		}
