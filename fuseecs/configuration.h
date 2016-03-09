@@ -18,6 +18,9 @@
 
 #define ENCFS_CONFIGURATION_FILE ".encfs6.xml"
 #define ENCFS_COMMAND "encfs -o allow_other -s --standard --extpass=\""
+#define CAT_COMMAND "cat "
+#define FUSERUNMOUNT_COMMAND "fusermount -u "
+#define PKILL_COMMAND "pkill -f '"
 #define GPG_SIGN_COMMAND "gpg2 --sign --local-user "
 #define GPG_ENCRYPTION_OPTION " --encrypt -r "
 #define GPG_OUTPUT_OPTION " --output "
@@ -30,8 +33,6 @@
 #define MAKEPASSWD_COMMAND "makepasswd --chars "
 #define PASSWORD_LENGTH 64
 #define PASSWORD_LENGTH_STRING "64"
-
-#define CAT_COMMAND "cat "
 
 #define DROPBOX_INTERNAL_FILES_DIRECTORY ".dropbox.cache"
 

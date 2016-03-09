@@ -61,8 +61,6 @@ void sign_and_encrypt(const char *data, const char *public_key_fingerprint, cons
 }
 
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name){
-	//Debug
-	printf("directory_contains_authentic_file called. encrypted_directory: %s, file_name: %s\n", encrypted_directory, file_name);
 	LOCAL_STR_CAT(file_name, OWN_PUBLIC_KEY_FINGERPRINT, file_name_with_fingerprint)
 	LOCAL_STR_CAT(encrypted_directory, file_name_with_fingerprint, path_to_file_without_file_ending)
 	LOCAL_STR_CAT(path_to_file_without_file_ending, ENCRYPTED_FILE_ENDING, path_to_file)
@@ -73,10 +71,8 @@ int directory_contains_authentic_file(char *encrypted_directory, char *file_name
 		} else {
 			DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_directory, file_name_with_fingerprint, result)
 		}
-		printf("end of directory_contains_authentic_file. encrypted_directory: %s, file_name: %s\n", encrypted_directory, file_name);
 		return 1;
 	} else {
-		printf("end of directory_contains_authentic_file. encrypted_directory: %s, file_name: %s\n", encrypted_directory, file_name);
 		return 0;
 	}
 }

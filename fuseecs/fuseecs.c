@@ -38,6 +38,7 @@
 #include <gpgme.h>
 #include <pthread.h>
 #include <sched.h>
+#include <signal.h>
 
 #include "configuration.h"
 #include "data_operations.h"
@@ -62,9 +63,29 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
  * Even not after restarting Dropbox. Touching the subdirectory helps.
  */
 
-/* General TODO: The encfs processes are no longer killed with our program. Find out, why, and fix this. */
-
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
+
+void termination_handler(int signum){
+	/* When we call encfs, it forks again and kills the process we created. That is why remembering our spawned
+	 * pids does not help us kill our processes. It is also not possible to get the child processes via pgrep.
+	 * Probably because the process is a zombie. So using pkill is probably the best way to do this.
+	 */
+	if(signum == SIGINT || signum == SIGTERM){
+		//Kill our encfs processes
+		LOCAL_STR_CAT(PKILL_COMMAND, ENCFS_COMMAND, pkill_cmd_with_encfs_cmd)
+		//Remove trailing "
+		pkill_cmd_with_encfs_cmd[strlen(pkill_cmd_with_encfs_cmd) - 1] = 0;
+		LOCAL_STR_CAT(pkill_cmd_with_encfs_cmd, CAT_COMMAND, pkill_cmd_without_root_directory)
+		LOCAL_STR_CAT(pkill_cmd_without_root_directory, ROOT_DIRECTORY, pkill_cmd_without_ending_quota)
+		LOCAL_STR_CAT(pkill_cmd_without_ending_quota, "'", pkill_cmd)
+		system(pkill_cmd);
+		//Unmount MOUNT_POINT
+		LOCAL_STR_CAT(FUSERUNMOUNT_COMMAND, MOUNTPOINT_DIRECTORY, fusermount_cmd)
+		system(fusermount_cmd);
+
+		exit(0);
+	}
+}
 
 long get_file_size(const char *path){
 	FILE *f = fopen(path, "r");
@@ -97,7 +118,7 @@ void create_encfs_directory(const char *encrypted_directory){
 	//This should be solved by the forbidden files list/virtual files. But Dropbox is still able to read the encfs file
 	//when reading the encrypted directory directly (not via the Dropbox folder). Is this a problem? It is not one, we
 	//have to solve, but we maybe can. Sandboxing Dropbox, so it can not read the encrypted folder, would be sufficient.
-	//chmod on the folder only is not sufficient, as it could still read files inside the folder. getfacl is does the job.
+	//chmod on the folder only is not sufficient, as it could still read files inside the folder. getfacl does the job.
 	/*
 	//Create configuration file with the right access rights (so Dropbox can not access it)
 	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_file)
@@ -125,20 +146,11 @@ void create_encfs_directory(const char *encrypted_directory){
 	//When in top folder, perform asymmetric encryption. Else, just put the password and path
 	//in .password file and let Encfs encrypt it
 	if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
-		//Debug
-		printf("In root directory, performing asymmetric encryption.\n");
-
 		sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 	} else {
-		//Debug
-		printf("Not in root directory. Writing password to file.\n");
-		
 		GET_FOLDER_NAME_ITERATIVELY(encrypted_directory, DECRYPT, decrypted_path)
 		LOCAL_STR_CAT(decrypted_path, "../", one_folder_above_decrypted_path)
 		STRIP_UPPER_DIRECTORIES_AND_SLASH(encrypted_directory, stripped_path)
-		//Debug
-		printf("Stripped path: %s.\n", stripped_path);
-		
 		LOCAL_STR_CAT(PASSWORD_FILE_NAME, stripped_path, password_file_with_stripped_path)
 		free(stripped_path);
 		LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)
@@ -178,10 +190,10 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 			path_to_compare_to = encrypted_directory;
 		}
 		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, path_to_compare_to, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
-		printf("encfs configuration data after decryption: %s\n", encfs_configuration_data);
 		//Write data to file
 		WRITE_STRING_TO_FILE(path_with_encfs_file, encfs_configuration_data)
 		
+		/*
 		//Debug
 		LOCAL_STR_CAT("/bin/bash -c \"cp ", encrypted_directory, cp_cmd_without_file)
 		LOCAL_STR_CAT(cp_cmd_without_file, ENCFS_CONFIGURATION_FILE, cp_cmd_without_file_ending)
@@ -191,6 +203,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 			fprintf(stderr, "Could not copy encfs configuration file with the following command: %s\n", cp_cmd);
 			exit(-1);
 		}
+		*/
 	}
 	
 	//Get decrypted password
@@ -213,6 +226,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	WRITE_STRING_TO_FILE(path_with_password_file, password)
 	free(password);
 	
+	
 	LOCAL_STR_CAT(ENCFS_COMMAND, CAT_COMMAND, cmd_without_password_file)
 	LOCAL_STR_CAT(cmd_without_password_file, path_with_password_file, cmd_with_password_file)
 	LOCAL_STR_CAT(cmd_with_password_file, "\" ", cmd_with_password_file_and_quotas)
@@ -221,13 +235,9 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
 	printf("before popen.\n");
 	printf("Executing the following command: %s\n", concatenated_cmd);
-	//if(system(concatenated_cmd)){
-	//	fprintf(stderr, "Error when executing encfs!\n");
-	//	exit(-1);
-	//}
 	popen(concatenated_cmd, "r");
-	//Endof Start encfs process
-	
+
+	/*
 	//Debug: Check if encfs changed our configuration file.
 	LOCAL_STR_CAT(path_with_encfs_file, ".old", path_with_old_encfs_file)
 	if(access(path_with_old_encfs_file, F_OK) == 0){
@@ -243,7 +253,8 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 			exit(-1);
 		}
 	}
-	
+	*/
+
 	//If there is no encrypted version of configuration file, create it.
 	//TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
 	//Maybe this problem only occurs when there are still encfs processes running (noticed this once).
@@ -392,7 +403,7 @@ void start_encfs_for_directory(char *encrypted_directory_maybe_without_slash){
 		fprintf(stderr, "Can't open %s\n", encrypted_directory);
 		exit(-1);
 	}
-	
+
 	while((m_dirent = readdir(m_dir)) != NULL){
 		if(strcmp(m_dirent->d_name, ".") && strcmp(m_dirent->d_name, "..") && strcmp(m_dirent->d_name, DROPBOX_INTERNAL_FILES_DIRECTORY)){
 			struct stat stbuf;
@@ -538,7 +549,6 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 //TODO: How can we make sure, that the started encfs is killed when we kill the process?
 static void *wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory(void *relative_encrypted_directory_maybe_without_slash_void_pointer)
 {
-	printf("New thread created (we are in function wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory now).\n");
 	char *relative_encrypted_directory_maybe_without_slash = (char *) relative_encrypted_directory_maybe_without_slash_void_pointer;
 	APPEND_SLASH_IF_NECESSARY(relative_encrypted_directory_maybe_without_slash, relative_encrypted_directory)
 	LOCAL_STR_CAT(ROOT_DIRECTORY, relative_encrypted_directory, encrypted_directory)
@@ -546,14 +556,10 @@ static void *wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_direc
 	LOCAL_STR_CAT(encrypted_directory_without_fingerprint, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory_without_file_ending)
 	LOCAL_STR_CAT(encrypted_directory_without_file_ending, ENCRYPTED_FILE_ENDING, encrypted_directory_with_file_name)
 	//TODO: Should we also wait, until Dropbox has completed writing to the file?
-	printf("Will wait for file: %s\n", encrypted_directory_with_file_name);
 	wait_until_file_is_created_and_has_content(encrypted_directory_with_file_name);
-	printf("The following file has been created: %s\n", encrypted_directory_with_file_name);
-	printf("Will call start_encfs_for_shared_directory.\n");
 	start_encfs_for_shared_directory(encrypted_directory, 0744);
 
 	free(relative_encrypted_directory_maybe_without_slash_void_pointer);
-	printf("End of wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory.\n");
 	return NULL;
 }
 
@@ -584,9 +590,7 @@ static int ecs_mkdir(const char *path, mode_t mode)
 			strcpy(not_const_path, path);
 			//Not needed, just for compiler
 			pthread_t thread;
-			
-			//Debug
-			printf("Calling wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory.\n");
+
 			pthread_create(&thread, NULL, wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory, not_const_path);
 		}
 	} else {
@@ -771,6 +775,15 @@ static struct fuse_operations ecs_oper = {
 
 int main(int argc, char *argv[])
 {
+	//See http://www.gnu.org/software/libc/manual/html_node/Sigaction-Function-Example.html
+	struct sigaction new_action;
+	/* Set up the structure to specify the new action. */
+	new_action.sa_handler = termination_handler;
+	sigemptyset(&new_action.sa_mask);
+	new_action.sa_flags = 0;
+	sigaction(SIGINT, &new_action, NULL);
+	sigaction(SIGTERM, &new_action, NULL);
+	
 	gpgme_check_version(NULL);
 	start_encfs_for_directory(ROOT_DIRECTORY);
 	umask(0);
