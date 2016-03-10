@@ -55,12 +55,12 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
  * a new encrypted file in .ecs/encrypted is created, which is not synced yet.
  */
 
-/* General TODO: From Dropbox's point of view, is it possible to do a path traversal attack? I.e. reading the folder
- * Dropbox/../decrypted ? This would then be done with the user's privileges.
- */
-
 /* General TODO: Dropbox does not synchronize files in directories like Dropbox/dir_1/subdirectory/
  * Even not after restarting Dropbox. Touching the subdirectory helps.
+ */
+
+/* General TODO: From Dropbox's point of view, is it possible to do a path traversal attack? I.e. reading the folder
+ * Dropbox/../decrypted ? This would then be done with the user's privileges.
  */
 
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
@@ -113,27 +113,14 @@ void wait_until_file_is_created_and_has_content(const char *path){
 void create_encfs_directory(const char *encrypted_directory){
 	//Debug
 	printf("create_encfs_directory called. encrypted_directory: %s\n", encrypted_directory);
-	
-	//TODO: On the virtual machine, encfs aborts, because it can not read the configuration file, if we do it like that.
-	//This should be solved by the forbidden files list/virtual files. But Dropbox is still able to read the encfs file
-	//when reading the encrypted directory directly (not via the Dropbox folder). Is this a problem? It is not one, we
-	//have to solve, but we maybe can. Sandboxing Dropbox, so it can not read the encrypted folder, would be sufficient.
-	//chmod on the folder only is not sufficient, as it could still read files inside the folder. getfacl does the job.
-	/*
-	//Create configuration file with the right access rights (so Dropbox can not access it)
-	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_file)
-	LOCAL_STR_CAT("touch ", path_with_file, touch_cmd)
-	if(system(touch_cmd)){
-		fprintf(stderr, "Could not touch encfs configuration file.\n");
-		exit(-1);
-	}
-	LOCAL_STR_CAT("chmod 600 ", path_with_file, chmod_cmd)
-	if(system(chmod_cmd)){
-		fprintf(stderr, "Could not chmod encfs configuration file.\n");
-		exit(-1);
-	}
-	*/
-	
+
+	/* We do not want Dropbox to be able to read our configuration file. Using chmod 600 is not enough, because
+	 * Dropbox accesses the encrypted folder with the normal user's access rights. So we implemented the forbidden files
+	 * list. But Dropbox is still able to read the file by reading the encrypted folder directly. We can prevent this
+	 * by using getfacl on the encrypted folder. It prevents the Dropbox user from reading anything in the encrypted
+	 * folder.
+	 */
+
 	//Create random password and encrypt it
 	GET_RANDOM_PASSWORD(password)
 	printf("password before encryption: %s\n", password);
@@ -205,27 +192,21 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		}
 		*/
 	}
-	
+
 	//Get decrypted password
 	GET_PASSWORD(encrypted_directory, password)
 	printf("password after decryption: %s\n", password);
-	
+
 	//Start encfs process
-	//Create password file with the right access rights (so Dropbox can not access it)
+	/* We do not want Dropbox to be able to read our password file. Using chmod 600 is not enough, because
+	 * Dropbox accesses the encrypted folder with the normal user's access rights. So we implemented the forbidden files
+	 * list. But Dropbox is still able to read the file by reading the encrypted folder directly. We can prevent this
+	 * by using getfacl on the encrypted folder. It prevents the Dropbox user from reading anything in the encrypted
+	 * folder.
+	 */
 	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
-	LOCAL_STR_CAT("touch ", path_with_password_file, touch_cmd)
-	if(system(touch_cmd)){
-		fprintf(stderr, "Could not touch password file.\n");
-		exit(-1);
-	}
-	LOCAL_STR_CAT("chmod 600 ", path_with_password_file, chmod_cmd)
-	if(system(chmod_cmd)){
-		fprintf(stderr, "Could not chmod password file.\n");
-		exit(-1);
-	}
 	WRITE_STRING_TO_FILE(path_with_password_file, password)
 	free(password);
-	
 	
 	LOCAL_STR_CAT(ENCFS_COMMAND, CAT_COMMAND, cmd_without_password_file)
 	LOCAL_STR_CAT(cmd_without_password_file, path_with_password_file, cmd_with_password_file)
@@ -256,12 +237,11 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	*/
 
 	//If there is no encrypted version of configuration file, create it.
-	//TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
-	//Maybe this problem only occurs when there are still encfs processes running (noticed this once).
+	/* TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
+	 * Maybe this problem only occurs when there are still encfs processes running (noticed this once).
+	 */
 	if(access(encrypted_encfs_file, F_OK) != 0){
 		//Wait for encfs to create the file
-		//Debug: Because there are problems with encfs on the virtual machine, we do not create the file before and use the second version
-		//while(get_file_size(path_with_encfs_file) == 0);
 		wait_until_file_is_created_and_has_content(path_with_encfs_file);
 		//Read file
 		READ_FILE(path_with_encfs_file, encfs_configuration_data)
@@ -271,10 +251,10 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		//Encrypt the data and write to file
 		sign_and_encrypt(path_and_encfs_configuration_data, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, ENCFS_CONFIGURATION_FILE);
 	}
-	
+
 	free(encrypted_directory);
 	free(mount_point);
-	
+
 	//Debug
 	printf("end of start_encfs. encrypted_directory: %s, mount_point: %s\n", encrypted_directory_maybe_without_slash, mount_point_maybe_without_slash);
 }
@@ -291,7 +271,7 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 	 * 4. Mark encrypted folder as not usable by placing a signed "do not use" file with the path in it.
 	 * 5. Start encfs with path for the encrypted directory and the decrypted path for the mountpoint
 	 */
-	
+
 	char *encrypted_folder_name = NULL;
 	{
 		STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_directory, encrypted_folder_name_local)
@@ -546,7 +526,6 @@ static int ecs_mknod(const char *path, mode_t mode, dev_t rdev)
 	CHANGE_PATH(xmp_mknod(CONCATENATED_PATH, mode, rdev))
 }
 
-//TODO: How can we make sure, that the started encfs is killed when we kill the process?
 static void *wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory(void *relative_encrypted_directory_maybe_without_slash_void_pointer)
 {
 	char *relative_encrypted_directory_maybe_without_slash = (char *) relative_encrypted_directory_maybe_without_slash_void_pointer;
@@ -580,12 +559,11 @@ static int ecs_mkdir(const char *path, mode_t mode)
 		}
 
 		if(strncmp(path, DROPBOX_INTERNAL_FILES_DIRECTORY, strlen(DROPBOX_INTERNAL_FILES_DIRECTORY)) != 0){
-			/* TODO: Return, so Dropbox continues and puts files in the folder.
+			/* Return, so Dropbox continues and puts files in the folder.
 			 * Start a thread waiting for Dropbox to put the DECRYPTED_FOLDER_NAME_FILE_NAME
 			 * file in the folder. When the file was created, this thread shall start
 			 * the start_encfs_for_shared_directory function.
 			 */
-
 			char *not_const_path = malloc(sizeof(char) * (strlen(path) + 1));
 			strcpy(not_const_path, path);
 			//Not needed, just for compiler

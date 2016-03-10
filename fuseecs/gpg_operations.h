@@ -8,7 +8,9 @@
 #define ENCRYPT 0
 #define DECRYPT 1
 
-//TODO: Check, if the signature has been made with the expected key.
+/* TODO: Check, if the signature has been made with the expected key. If we do not check this, the cloud storage
+ * provider could place the data signed with any trusted key in our key ring in our cloud storage folder.
+ */
 #define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
 	size_t length;\
 	{\
