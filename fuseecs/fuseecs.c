@@ -46,17 +46,25 @@
 
 const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FILE_NAME, ENCFS_CONFIGURATION_FILE};
 
-/* General TODO: Dropbox does not do the synchronisation automatically anymore. We can make it by choosing
+/* Dropbox does not do the synchronisation automatically anymore. We can make it by choosing
  * stop synchronisation and then start synchronisation.
  * When we touch the file (as the dropbox user), e.g. touch Dropbox/9NY4zYsTpDh5hTS9644caqGa, Dropbox syncs
  * it afterwards. Touching the file directly, i.e. touch .ecs/encrypted/9NY4zYsTpDh5hTS9644caqGa does not work.
  * Even touching the file as the normal user, i.e. touch Dropbox/9NY4zYsTpDh5hTS9644caqGa works. Dropbox then
  * syncs the file. Anyhow, this command creates a file with the plaintext name 9NY4zYsTpDh5hTS9644caqGa, i.e.
  * a new encrypted file in .ecs/encrypted is created, which is not synced yet.
- */
-
-/* General TODO: Dropbox does not synchronize files in directories like Dropbox/dir_1/subdirectory/
+ *
+ * Dropbox does not synchronize files in directories like Dropbox/dir_1/subdirectory/
  * Even not after restarting Dropbox. Touching the subdirectory helps.
+ *
+ * It seems like Dropbox uses inotify to get notified about file changes. See for example
+ * http://stillatmylinux.com/dropbox-cant-monitor-the-filesystem/ . inotify and fuse directories do not seem
+ * to work together, see for example https://sourceware.org/ml/libc-help/2011-08/msg00009.html
+ * and http://comments.gmane.org/gmane.comp.file-systems.fuse.devel/11539
+ * and https://sourceforge.net/p/fuse/mailman/message/24625009/
+ *
+ * This problem is on the libfuse TODO list. See https://github.com/libfuse/libfuse/wiki/TODO-List (look
+ * for "inotify support"). I asked a question concerning this on the libfuse mailing list.
  */
 
 /* General TODO: From Dropbox's point of view, is it possible to do a path traversal attack? I.e. reading the folder
