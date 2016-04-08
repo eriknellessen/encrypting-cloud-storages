@@ -64,7 +64,8 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
  * and https://sourceforge.net/p/fuse/mailman/message/24625009/
  *
  * This problem is on the libfuse TODO list. See https://github.com/libfuse/libfuse/wiki/TODO-List (look
- * for "inotify support"). I asked a question concerning this on the libfuse mailing list.
+ * for "inotify support"). I asked a question concerning this on the libfuse mailing list. See
+ * https://sourceforge.net/p/fuse/mailman/fuse-devel/thread/56E69275.1070106%40informatik.hu-berlin.de/#msg34933423
  */
 
 /* General TODO: From Dropbox's point of view, is it possible to do a path traversal attack? I.e. reading the folder
@@ -140,9 +141,11 @@ void create_encfs_directory(const char *encrypted_directory){
 	SEPARATE_STRINGS(encrypted_directory, password, plain_text)
 	//When in top folder, perform asymmetric encryption. Else, just put the password and path
 	//in .password file and let Encfs encrypt it
-	if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
+	//In the user-controlled-decryption-operations setting, we always want to do the asymmetric encryption.
+	//Else, no control via the token over the decryption operations is given.
+	//if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
 		sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
-	} else {
+	/*} else {
 		GET_FOLDER_NAME_ITERATIVELY(encrypted_directory, DECRYPT, decrypted_path)
 		LOCAL_STR_CAT(decrypted_path, "../", one_folder_above_decrypted_path)
 		STRIP_UPPER_DIRECTORIES_AND_SLASH(encrypted_directory, stripped_path)
@@ -150,7 +153,7 @@ void create_encfs_directory(const char *encrypted_directory){
 		free(stripped_path);
 		LOCAL_STR_CAT(one_folder_above_decrypted_path, password_file_with_stripped_path, password_path)
 		WRITE_STRING_TO_FILE(password_path, plain_text)
-	}
+	}*/
 	
 	//Debug
 	printf("end of create_encfs_directory. encrypted_directory: %s\n", encrypted_directory);

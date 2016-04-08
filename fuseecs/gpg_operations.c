@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+//TODO: Do not do hybrid encryption, only do asymmetric encryption. Else, we only see the data encryption key on the token.
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
 	gpgme_ctx_t gpgme_ctx;
 	if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){
