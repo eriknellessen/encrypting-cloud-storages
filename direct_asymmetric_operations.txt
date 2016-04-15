@@ -1,0 +1,19 @@
+Encrypting:
+Function gcry_error_t gcry_pk_encrypt (gcry_sexp_t *r_ciph, gcry_sexp_t data, gcry_sexp_t pkey) from libgcrypt can be used, see:
+https://gnupg.org/documentation/manuals/gcrypt/Cryptographic-Functions.html#Cryptographic-Functions
+
+Decrypting:
+Function iso7816_decipher (in file scd/iso7816.{c,h}) can be used to decrypt stuff using a smart card. This could be a problem, though, as we would have to kind of hack into GnuPG to use it. Maybe it is easier to use libopensc:
+https://github.com/OpenSC/OpenSC/blob/master/src/libopensc/card-openpgp.c
+
+The decipher command can also be found on page 54 in
+http://g10code.com/docs/openpgp-card-3.0.pdf
+
+Possibilities to use OpenSC:
+	- Just send simple APDUs via OpenSC-Tool, or, even better, via scriptor (part of pcsc-tools). Scriptor can take APDUs one after the other.
+	- Program own tool to do that. This would be a little more elegant. (But also more complicated.)
+		- Copy the OpenSC openpgp driver and remove the bugs (in the init function, do not use select file).
+		- Configure OpenSC, so the driver is taken for an android smartphone
+		- Use the functions like openpgp-tool to to deciphering
+
+Idea: Write a function doing the APDU transmit and transceive. This way, we can first implement the easy solution and the more elegant solution afterwards, if needed.

@@ -1,0 +1,3 @@
+[submodule "using_libopensc_to_access_token/OpenSC"]
+	path = using_libopensc_to_access_token/OpenSC
+	url = https://github.com/OpenSC/OpenSC.git
