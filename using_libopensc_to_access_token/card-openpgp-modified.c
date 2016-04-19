@@ -39,6 +39,7 @@ static struct sc_card_operations *iso_ops;
 #include <string.h>
 #include <libopensc/internal.h>
 #include <libopensc/pkcs15.h>
+#include <libopensc/asn1.h>
 
 static struct sc_card_operations *iso_ops;
 
@@ -807,54 +808,54 @@ pgp_get_blob(sc_card_t *card, pgp_blob_t *blob, unsigned int id,
 /**
  * Internal: search recursively for a blob by ID below a given root.
  */
-static int
-pgp_seek_blob(sc_card_t *card, pgp_blob_t *root, unsigned int id,
-		pgp_blob_t **ret)
-{
-	pgp_blob_t	*child;
-	int			r;
-
-	if ((r = pgp_get_blob(card, root, id, ret)) == 0)
-		/* the sought blob is right under root */
-		return r;
-
-	/* not found, seek deeper */
-	for (child = root->files; child; child = child->next) {
-		/* The DO of SIMPLE type or the DO holding certificate
-		 * does not contain children */
-		if (child->info->type == SIMPLE || child->id == DO_CERT)
-			continue;
-		r = pgp_seek_blob(card, child, id, ret);
-		if (r == 0)
-			return r;
-	}
-
-	return SC_ERROR_FILE_NOT_FOUND;
-}
+// static int
+// pgp_seek_blob(sc_card_t *card, pgp_blob_t *root, unsigned int id,
+// 		pgp_blob_t **ret)
+// {
+// 	pgp_blob_t	*child;
+// 	int			r;
+// 
+// 	if ((r = pgp_get_blob(card, root, id, ret)) == 0)
+// 		/* the sought blob is right under root */
+// 		return r;
+// 
+// 	/* not found, seek deeper */
+// 	for (child = root->files; child; child = child->next) {
+// 		/* The DO of SIMPLE type or the DO holding certificate
+// 		 * does not contain children */
+// 		if (child->info->type == SIMPLE || child->id == DO_CERT)
+// 			continue;
+// 		r = pgp_seek_blob(card, child, id, ret);
+// 		if (r == 0)
+// 			return r;
+// 	}
+// 
+// 	return SC_ERROR_FILE_NOT_FOUND;
+// }
 
 
 /**
  * Internal: find a blob by tag - pgp_seek_blob with optimizations.
  */
-static pgp_blob_t *
-pgp_find_blob(sc_card_t *card, unsigned int tag)
-{
-	struct pgp_priv_data *priv = DRVDATA(card);
-	pgp_blob_t *blob = NULL;
-	int r;
-
-	/* check if current selected blob is which we want to test */
-	if (priv->current->id == tag) {
-		return priv->current;
-	}
-	/* look for the blob representing the DO */
-	r = pgp_seek_blob(card, priv->mf, tag, &blob);
-	if (r < 0) {
-		sc_log(card->ctx, "Failed to seek the blob representing the tag %04X. Error %d.", tag, r);
-		return NULL;
-	}
-	return blob;
-}
+// static pgp_blob_t *
+// pgp_find_blob(sc_card_t *card, unsigned int tag)
+// {
+// 	struct pgp_priv_data *priv = DRVDATA(card);
+// 	pgp_blob_t *blob = NULL;
+// 	int r;
+// 
+// 	/* check if current selected blob is which we want to test */
+// 	if (priv->current->id == tag) {
+// 		return priv->current;
+// 	}
+// 	/* look for the blob representing the DO */
+// 	r = pgp_seek_blob(card, priv->mf, tag, &blob);
+// 	if (r < 0) {
+// 		sc_log(card->ctx, "Failed to seek the blob representing the tag %04X. Error %d.", tag, r);
+// 		return NULL;
+// 	}
+// 	return blob;
+// }
 
 /**
  * Internal: get public key from card: as DF + sub-wEFs.
@@ -940,7 +941,7 @@ static int
 pgp_modified_init(sc_card_t *card)
 {
 	struct pgp_priv_data *priv;
-	sc_path_t	aid;
+	//sc_path_t	aid;
 	sc_file_t	*file = NULL;
 	struct do_info	*info;
 	int		r;
