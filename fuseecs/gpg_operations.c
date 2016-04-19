@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "direct_asymmetric_encryption/direct_rsa_encryption.h"
+
 //TODO: Do not do hybrid encryption, only do asymmetric encryption. Else, we only see the data encryption key on the token.
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
 	gpgme_ctx_t gpgme_ctx;
@@ -59,6 +61,20 @@ void sign_and_encrypt(const char *data, const char *public_key_fingerprint, cons
 	gpgme_free(encrypted_data);
 	gpgme_data_release(gpgme_plaintext_data);
 	gpgme_release(gpgme_ctx);
+}
+
+void direct_rsa_encrypt_and_save_to_file(const char *plain_text, const char *public_key_fingerprint, const char *path, const char *file_name){
+	size_t cipher_text_length;
+	unsigned char *cipher_text = rsa_encrypt(plain_text, public_key_fingerprint, &cipher_text_length);
+
+	//Concatenate path
+	LOCAL_STR_CAT(path, file_name, path_with_file_name)
+	LOCAL_STR_CAT(path_with_file_name, public_key_fingerprint, path_with_file_name_and_public_key_fingerprint)
+	LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
+	
+	WRITE_BINARY_DATA_TO_FILE(concatenated_path, cipher_text, cipher_text_length)
+
+	free(cipher_text);
 }
 
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name){

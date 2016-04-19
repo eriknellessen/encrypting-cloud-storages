@@ -144,7 +144,8 @@ void create_encfs_directory(const char *encrypted_directory){
 	//In the user-controlled-decryption-operations setting, we always want to do the asymmetric encryption.
 	//Else, no control via the token over the decryption operations is given.
 	//if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
-		sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
+		//sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
+		direct_rsa_encrypt_and_save_to_file(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 	/*} else {
 		GET_FOLDER_NAME_ITERATIVELY(encrypted_directory, DECRYPT, decrypted_path)
 		LOCAL_STR_CAT(decrypted_path, "../", one_folder_above_decrypted_path)

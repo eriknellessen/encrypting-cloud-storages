@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include "data_operations.h"
 
+#include "direct_asymmetric_decryption_on_token/access_token.h"
+
 #define ENCRYPT 0
 #define DECRYPT 1
 
@@ -47,6 +49,19 @@
 	RESULT[length] = 0;\
 	gpgme_free(plain_text);
 
+#define DECRYPT_ON_TOKEN(PATH, RESULT) /*Get cipher text from file */\
+	/* File might contain zeros, so we need the length. It is saved in the 'pos' variable. */\
+	READ_FILE(PATH, cipher_text)\
+	\
+	/* Decrypt */\
+	char *plain_text;\
+	while(rsa_decrypt_on_token(cipher_text, pos, &plain_text) != 0);\
+	\
+	/* Copy result to the local variable. */\
+	char RESULT[strlen(plain_text) + 1];\
+	strcpy(RESULT, plain_text);\
+	free(plain_text);\
+
 #define VERIFY_PATH(DATA, PATH, RESULT) size_t data_length;\
 	size_t end_of_path;\
 	{\
@@ -69,6 +84,12 @@
 	DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)\
 	VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)
 
+#define DECRYPT_DATA_ON_TOKEN_AND_VERIFY_PATH(PATH_TO_DIRECTORY, PATH_TO_VERIFY, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH_TO_DIRECTORY, FILE_NAME, path_without_file_ending)\
+	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
+	/*DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)*/\
+	DECRYPT_ON_TOKEN(path_with_file_ending, path_and_data)\
+	VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)
+
 #define SET_PATH_TO_COMPARE_TO(PATH, RESULT)char *RESULT = NULL;\
 	STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(PATH, directory_name)\
 	if(directory_contains_authentic_file(PATH, DECRYPTED_FOLDER_NAME_FILE_NAME)){\
@@ -88,7 +109,8 @@
 		LOCAL_STR_CAT(path_with_password_prefix_and_fingerprint, ENCRYPTED_FILE_ENDING, path_with_password_file)\
 		if(access(path_with_password_file, F_OK) == 0){\
 			SET_PATH_TO_COMPARE_TO(PATH, path_to_compare_to)\
-			DECRYPT_DATA_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)\
+			/*DECRYPT_DATA_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)*/\
+			DECRYPT_DATA_ON_TOKEN_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)\
 			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
 		} else {\
 			LOCAL_STR_CAT(DECRYPTED_PATH, "../", one_folder_above_decrypted_path)\
@@ -111,7 +133,7 @@
 	RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)
 
 //encfsctl decode --extpass="echo password" ROOT_DIRECTORY DIRECTORY
-	#define GET_ENCRYPTED_FOLDER_NAME(UPPER_DIRECTORY, DIRECTORY, PASSWORD, RESULT) LOCAL_STR_CAT("encfsctl encode --extpass=\"echo ", PASSWORD, cmd_with_password)\
+#define GET_ENCRYPTED_FOLDER_NAME(UPPER_DIRECTORY, DIRECTORY, PASSWORD, RESULT) LOCAL_STR_CAT("encfsctl encode --extpass=\"echo ", PASSWORD, cmd_with_password)\
 	LOCAL_STR_CAT(cmd_with_password, "\" ", cmd_with_password_and_ending_quotation_mark)\
 	LOCAL_STR_CAT(cmd_with_password_and_ending_quotation_mark, UPPER_DIRECTORY, cmd_with_root_directory)\
 	LOCAL_STR_CAT(cmd_with_root_directory, " ", cmd_with_root_directory_and_space)\
@@ -207,6 +229,7 @@
 	printf("Got the following random password: %s\n", RESULT);
 
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
+void direct_rsa_encrypt_and_save_to_file(const char *plain_text, const char *public_key_fingerprint, const char *path, const char *file_name);
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name);
 
 #endif

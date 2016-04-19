@@ -240,9 +240,9 @@ unsigned char *rsa_encrypt(const char *plain_text, const char *public_key_finger
 	gcry_mpi_t result_as_mpi = get_mpi_from_sexp(s_ciph, "a", GCRYMPI_FMT_USG);
 	gcry_sexp_release(s_ciph);
 	//Debug
-	gcry_log_debugmpi ("result_as_mpi", result_as_mpi);
+	gcry_log_debugmpi("result_as_mpi", result_as_mpi);
 	unsigned char *result;
-	rc = gcry_mpi_aprint (GCRYMPI_FMT_USG, &result, result_length, result_as_mpi);
+	rc = gcry_mpi_aprint(GCRYMPI_FMT_USG, &result, result_length, result_as_mpi);
 	if(rc){
 		fprintf(stderr, "File: %s, Line: %i.\n", __FILE__, __LINE__);
 		exit(-1);
@@ -252,16 +252,16 @@ unsigned char *rsa_encrypt(const char *plain_text, const char *public_key_finger
 	return result;
 }
 
-int main(int argc, char *argv []){
-	size_t cipher_text_length;
-	unsigned char *cipher_text = rsa_encrypt("00010203040506070809101112131415", "FD654C6F", &cipher_text_length);
-	printf("cipher_text (%i bytes): ", cipher_text_length);
-	int i;
-	for(i = 0; i < cipher_text_length; i++){
-		printf("%c", cipher_text[i]);
-	}
-	printf("\n");
-	free(cipher_text);
-
-	return 0;
-}
+// int main(int argc, char *argv []){
+// 	size_t cipher_text_length;
+// 	unsigned char *cipher_text = rsa_encrypt("00010203040506070809101112131415", "FD654C6F", &cipher_text_length);
+// 	printf("cipher_text (%i bytes): ", cipher_text_length);
+// 	int i;
+// 	for(i = 0; i < cipher_text_length; i++){
+// 		printf("%c", cipher_text[i]);
+// 	}
+// 	printf("\n");
+// 	free(cipher_text);
+// 
+// 	return 0;
+// }
