@@ -158,14 +158,12 @@ gcry_mpi_t get_gcry_mpi_t_from_binary_string(const char *binary_string, int bina
 		fprintf(stderr, "File: %s, Line: %i.\n", __FILE__, __LINE__);
 		exit(-1);
 	}
-	//Debug
-	printf("scanned_length: %i\n", scanned_length);
 
 	return mpi;
 }
 
 //Cipher text might contain zeros, so result_length is necessary
-unsigned char *rsa_encrypt(const char *plain_text, const char *public_key_fingerprint, size_t *result_length){
+char *rsa_encrypt(const char *plain_text, const char *public_key_fingerprint, size_t *result_length){
 	//Get public key from gpg
 	char *public_key_string = get_public_key_from_gpg(public_key_fingerprint);
 	//Debug
@@ -249,7 +247,7 @@ unsigned char *rsa_encrypt(const char *plain_text, const char *public_key_finger
 	}
 	gcry_mpi_release(result_as_mpi);
 
-	return result;
+	return (char *) result;
 }
 
 // int main(int argc, char *argv []){

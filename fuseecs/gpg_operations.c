@@ -65,7 +65,7 @@ void sign_and_encrypt(const char *data, const char *public_key_fingerprint, cons
 
 void direct_rsa_encrypt_and_save_to_file(const char *plain_text, const char *public_key_fingerprint, const char *path, const char *file_name){
 	size_t cipher_text_length;
-	unsigned char *cipher_text = rsa_encrypt(plain_text, public_key_fingerprint, &cipher_text_length);
+	char *cipher_text = rsa_encrypt(plain_text, public_key_fingerprint, &cipher_text_length);
 
 	//Concatenate path
 	LOCAL_STR_CAT(path, file_name, path_with_file_name)

@@ -1,1 +1,1 @@
-int rsa_decrypt_on_token(const unsigned char *cipher_text, int cipher_text_length, unsigned char **plain_text);
+int rsa_decrypt_on_token(const char *cipher_text, int cipher_text_length, char **plain_text);

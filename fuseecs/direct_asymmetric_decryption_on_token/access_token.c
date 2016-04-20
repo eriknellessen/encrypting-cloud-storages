@@ -68,7 +68,7 @@ int verify_pin(sc_card_t *card){
 	return 0;
 }
 
-int decipher(const u8 *cipher_text, int cipher_text_length, unsigned char **plain_text, sc_card_t *card){
+int decipher(const u8 *cipher_text, int cipher_text_length, u8 **plain_text, sc_card_t *card){
 	int r;
 	int plain_text_length = cipher_text_length;
 	printf("File: %s Line: %i\n", __FILE__, __LINE__);
@@ -90,7 +90,7 @@ int decipher(const u8 *cipher_text, int cipher_text_length, unsigned char **plai
 }
 
 //plain_text will most likely not contain zeros, so we do not need to return the length
-int rsa_decrypt_on_token(const u8 *cipher_text, int cipher_text_length, unsigned char **plain_text){
+int rsa_decrypt_on_token(const char *cipher_text, int cipher_text_length, char **plain_text){
 	sc_card_t *card;
 
 	printf("File: %s Line: %i\n", __FILE__, __LINE__);
@@ -116,7 +116,7 @@ int rsa_decrypt_on_token(const u8 *cipher_text, int cipher_text_length, unsigned
 
 	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	//Do the actual deciphering
-	if(decipher(cipher_text, cipher_text_length, plain_text, card) != 0){
+	if(decipher((u8 *) cipher_text, cipher_text_length, (u8 **) plain_text, card) != 0){
 		return -1;
 	}
 	printf("File: %s Line: %i\n", __FILE__, __LINE__);
