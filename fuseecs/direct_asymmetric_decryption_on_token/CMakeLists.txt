@@ -15,3 +15,4 @@ target_link_libraries(directAsymmetricDecryptionOnToken ${OPENSC})
 
 add_library(card-openpgp-modified SHARED OpenSC/src/libopensc/asn1.c OpenSC/src/libopensc/sc.c OpenSC/src/libopensc/card.c OpenSC/src/libopensc/card-openpgp.c card-openpgp-modified.c)
 target_link_libraries(card-openpgp-modified ${OPENSC})
+install(TARGETS card-openpgp-modified DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
