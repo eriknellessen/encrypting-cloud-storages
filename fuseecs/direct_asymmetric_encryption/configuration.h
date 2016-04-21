@@ -1,0 +1,1 @@
+#define CMAKE_INSTALL_FULL_BINDIR ""

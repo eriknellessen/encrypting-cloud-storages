@@ -4,9 +4,11 @@
 #include <assert.h>
 #include <ctype.h>
 
+#include "configuration.h"
+
 #define BEGIN_OF_PGP_DUMP_COMMAND "echo \""
 #define ESCAPED_QUOTA "\""
-#define END_OF_PGPDUMP_COMMAND " | python parse_public_key.py"
+#define END_OF_PGPDUMP_COMMAND " | python "CMAKE_INSTALL_FULL_BINDIR"/parse_public_key.py"
 #define BUFFER_SIZE 1024
 
 gcry_mpi_t get_mpi_from_sexp (gcry_sexp_t sexp, const char *item, int mpifmt){
