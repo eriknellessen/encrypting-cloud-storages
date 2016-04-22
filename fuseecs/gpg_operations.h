@@ -53,33 +53,27 @@
 
 #define DECRYPT_ON_TOKEN(PATH, RESULT) /*Get cipher text from file */\
 	/* File might contain zeros, so we need the length. It is saved in the 'pos' variable. */\
-	READ_FILE(PATH, cipher_text)\
+	READ_FILE(PATH, file_content)\
 	\
+	/* We are decrypting a password here. So we need to strip the path, send it to the\
+	* token, then send the cipher text. */\
+	/* Strip the path */\
+	UNSEPARATE_STRINGS(file_content, pos, meta_data, cipher_text, cipher_text_length)\
 	/* Decrypt */\
+	/* TODO: Decryption is not working yet. Additionally, the meta data has to be transferred to the token first. */\
 	char *plain_text;\
-	while(rsa_decrypt_on_token(cipher_text, pos, &plain_text) != 0);\
+	while(rsa_decrypt_on_token(cipher_text, cipher_text_length, &plain_text) != 0);\
 	\
 	/* Copy result to the local variable. */\
 	char RESULT[strlen(plain_text) + 1];\
 	strcpy(RESULT, plain_text);\
 	free(plain_text);\
 
-#define VERIFY_PATH(DATA, PATH, RESULT) size_t data_length;\
-	size_t end_of_path;\
-	{\
-		char *end_of_path_string = strchr(DATA, PATH_SEPARATOR);\
-		end_of_path = end_of_path_string - DATA;\
-		char path[end_of_path + 1];\
-		strncpy(path, DATA, end_of_path);\
-		path[end_of_path] = 0;\
-		if(strcmp(path, PATH)){\
-			fprintf(stderr, "Data for path %s in path %s.\n", PATH, path);\
-			exit(-1);\
-		}\
-		data_length = strlen(DATA - (end_of_path + 1));\
+#define VERIFY_PATH(DATA, PATH, RESULT) UNSEPARATE_STRINGS(DATA, strlen(DATA), path, RESULT, result_length)\
+	if(strcmp(path, PATH)){\
+		fprintf(stderr, "Data for path %s in path %s.\n", PATH, path);\
+		exit(-1);\
 	}\
-	char RESULT[data_length + 1];\
-	strcpy(RESULT, DATA + end_of_path + 1);
 
 #define DECRYPT_DATA_AND_VERIFY_PATH(PATH_TO_DIRECTORY, PATH_TO_VERIFY, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH_TO_DIRECTORY, FILE_NAME, path_without_file_ending)\
 	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
@@ -89,8 +83,9 @@
 #define DECRYPT_DATA_ON_TOKEN_AND_VERIFY_PATH(PATH_TO_DIRECTORY, PATH_TO_VERIFY, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH_TO_DIRECTORY, FILE_NAME, path_without_file_ending)\
 	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
 	/*DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)*/\
-	DECRYPT_ON_TOKEN(path_with_file_ending, path_and_data)\
-	VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)
+	DECRYPT_ON_TOKEN(path_with_file_ending, RESULT)\
+	/* This is no more needed, as the user verified the path. */\
+	/*VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)*/
 
 #define SET_PATH_TO_COMPARE_TO(PATH, RESULT)char *RESULT = NULL;\
 	STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(PATH, directory_name)\
@@ -110,7 +105,7 @@
 		LOCAL_STR_CAT(path_with_slash_at_the_end, password_file, path_with_password_prefix_and_fingerprint)\
 		LOCAL_STR_CAT(path_with_password_prefix_and_fingerprint, ENCRYPTED_FILE_ENDING, path_with_password_file)\
 		if(access(path_with_password_file, F_OK) == 0){\
-			SET_PATH_TO_COMPARE_TO(PATH, path_to_compare_to)\
+			/*SET_PATH_TO_COMPARE_TO(PATH, path_to_compare_to)*/\
 			/*DECRYPT_DATA_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)*/\
 			DECRYPT_DATA_ON_TOKEN_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)\
 			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\

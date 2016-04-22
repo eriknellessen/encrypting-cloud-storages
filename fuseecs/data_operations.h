@@ -91,6 +91,22 @@ extern const char *Forbidden_file_names[];
 	LOCAL_STR_CAT(FIRST, separator_string, first_string_with_separator)\
 	LOCAL_STR_CAT(first_string_with_separator, SECOND, RESULT)
 
+/* End might be binary data, so length is needed */\
+#define UNSEPARATE_STRINGS(DATA, DATA_LENGTH, BEGINNING, END, END_LENGTH) size_t end_of_beginning;\
+	{\
+		char *end_of_beginning_string = strchr(DATA, PATH_SEPARATOR);\
+		end_of_beginning = end_of_beginning_string - DATA;\
+	}\
+	char BEGINNING[end_of_beginning + 1];\
+	strncpy(BEGINNING, DATA, end_of_beginning);\
+	BEGINNING[end_of_beginning] = 0;\
+	/* TODO: Is this a bug? Was: data_length = strlen(DATA - (end_of_path + 1));\*/\
+	int END_LENGTH = DATA_LENGTH - strlen(BEGINNING);\
+	char END[END_LENGTH + 1];\
+	memcpy(END, DATA + end_of_beginning + 1, END_LENGTH);\
+	/* Attention: END might be binary data, can not always be treated as string afterwards. */\
+	END[END_LENGTH] = 0;
+
 #define RUN_COMMAND_AND_GET_OUTPUT(COMMAND, RESULT) char *data = NULL;\
 	int pos = 0;\
 	{\
