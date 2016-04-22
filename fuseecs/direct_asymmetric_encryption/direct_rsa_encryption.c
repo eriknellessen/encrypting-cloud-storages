@@ -252,6 +252,14 @@ char *rsa_encrypt(const char *plain_text, const char *public_key_fingerprint, si
 	return (char *) result;
 }
 
+char *compute_hash_value_from_meta_data_lib_function(const char *meta_data, int meta_data_length){
+	int hash_value_length = gcry_md_get_algo_dlen(HASH_ALGORITHM) + 1;
+	char *hash_value = malloc(hash_value_length);
+	gcry_md_hash_buffer(HASH_ALGORITHM, hash_value, meta_data, meta_data_length);
+	hash_value[hash_value_length - 1] = 0;
+	return hash_value;
+}
+
 // int main(int argc, char *argv []){
 // 	size_t cipher_text_length;
 // 	unsigned char *cipher_text = rsa_encrypt("00010203040506070809101112131415", "FD654C6F", &cipher_text_length);

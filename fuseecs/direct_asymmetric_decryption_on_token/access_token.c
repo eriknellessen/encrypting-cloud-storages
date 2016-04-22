@@ -58,6 +58,7 @@ int set_rsa_decryption_security_environment(sc_card_t *card){
 
 int verify_pin(sc_card_t *card){
 	int tries_left, r;
+	//TODO: Get PIN from user/card reader
 	const u8 pin_value [] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36};
 	r = sc_verify(card, SC_AC_CHV, 2, pin_value, sizeof pin_value, &tries_left);
 	if(r){

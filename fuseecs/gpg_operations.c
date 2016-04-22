@@ -41,8 +41,10 @@ void sign_and_encrypt(const char *data, const char *public_key_fingerprint, cons
 		exit(-1);
 	}
 
-	if(gpgme_op_encrypt_sign(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data) != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not encrypt and sign plaintext.\n");
+	//TODO: Find out, why gpgme gets stuck here. gpg2 works like a charm doing such operations.
+	int r = gpgme_op_encrypt_sign(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data);
+	if(r != GPG_ERR_NO_ERROR){
+		fprintf(stderr, "Could not encrypt and sign plaintext. %s %s\n", gpgme_strsource(r), gpgme_strerror(r));
 		exit(-1);
 	}
 	gpgme_signers_clear(gpgme_ctx);
@@ -75,6 +77,10 @@ void direct_rsa_encrypt_and_save_to_file(const char *plain_text, const char *pub
 	WRITE_BINARY_DATA_TO_FILE(concatenated_path, cipher_text, cipher_text_length)
 
 	free(cipher_text);
+}
+
+char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length){
+	return compute_hash_value_from_meta_data_lib_function(meta_data, meta_data_length);
 }
 
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name){

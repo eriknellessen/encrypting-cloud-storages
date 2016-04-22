@@ -230,6 +230,7 @@
 
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
 void direct_rsa_encrypt_and_save_to_file(const char *plain_text, const char *public_key_fingerprint, const char *path, const char *file_name);
+char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length);
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name);
 
 #endif

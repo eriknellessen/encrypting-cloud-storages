@@ -138,7 +138,15 @@ void create_encfs_directory(const char *encrypted_directory){
 	/*
 	 * Format: "/path/to/folder/encrypted/with/the/password\0x01password"
 	 */
-	SEPARATE_STRINGS(encrypted_directory, password, plain_text)
+	/* This check is now (in the user-controlled-decryption-operations setting) done by the user on the token.
+	 * So, saving the plaintext path and encrypting only the hash value is enough. The plaintext path has to
+	 * be read and sent to the token before decryption.
+	 */
+	GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_directory)
+	char *hash_value_of_decrypted_directory = compute_hash_value_from_meta_data(decrypted_directory, strlen(decrypted_directory));
+	//SEPARATE_STRINGS(encrypted_directory, password, plain_text)
+	SEPARATE_STRINGS(hash_value_of_decrypted_directory, password, plain_text)
+	free(hash_value_of_decrypted_directory);
 	//When in top folder, perform asymmetric encryption. Else, just put the password and path
 	//in .password file and let Encfs encrypt it
 	//In the user-controlled-decryption-operations setting, we always want to do the asymmetric encryption.
@@ -146,6 +154,22 @@ void create_encfs_directory(const char *encrypted_directory){
 	//if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
 		//sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 		direct_rsa_encrypt_and_save_to_file(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
+		//Add meta data to the beginning of the file
+		//Concatenate path
+		LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_file_name)
+		LOCAL_STR_CAT(path_with_file_name, OWN_PUBLIC_KEY_FINGERPRINT, path_with_file_name_and_public_key_fingerprint)
+		LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
+		long cipher_text_length;
+		char *meta_data_and_cipher_text = NULL;
+		{
+			READ_FILE(concatenated_path, cipher_text)
+			//pos contains length of read cipher_text, (see macro READ_FILE)
+			cipher_text_length = pos;
+			SEPARATE_STRINGS(decrypted_directory, cipher_text, meta_data_and_cipher_text_local)
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(meta_data_and_cipher_text_local, meta_data_and_cipher_text)
+		}
+		WRITE_BINARY_DATA_TO_FILE(concatenated_path, meta_data_and_cipher_text, strlen(decrypted_directory) + 1 + cipher_text_length)
+		free(meta_data_and_cipher_text);
 	/*} else {
 		GET_FOLDER_NAME_ITERATIVELY(encrypted_directory, DECRYPT, decrypted_path)
 		LOCAL_STR_CAT(decrypted_path, "../", one_folder_above_decrypted_path)
