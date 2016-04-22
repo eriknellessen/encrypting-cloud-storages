@@ -42,7 +42,9 @@ void sign_and_encrypt(const char *data, const char *public_key_fingerprint, cons
 	}
 
 	//TODO: Find out, why gpgme gets stuck here. gpg2 works like a charm doing such operations.
-	int r = gpgme_op_encrypt_sign(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data);
+	//For now, we are skipping the signature
+	//int r = gpgme_op_encrypt_sign(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data);
+	int r = gpgme_op_encrypt(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data);
 	if(r != GPG_ERR_NO_ERROR){
 		fprintf(stderr, "Could not encrypt and sign plaintext. %s %s\n", gpgme_strsource(r), gpgme_strerror(r));
 		exit(-1);

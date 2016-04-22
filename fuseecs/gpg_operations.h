@@ -31,7 +31,9 @@
 			fprintf(stderr, "Could not create GPGME data handle for decrypted data.\n");\
 			exit(-1);\
 		}\
-		if(gpgme_op_decrypt_verify(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
+		/* TODO: Find out, why gpgme gets stuck when signing with a token. For now, we are skipping the verifying. */\
+		/*if(gpgme_op_decrypt_verify(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\*/\
+		if(gpgme_op_decrypt(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
 			fprintf(stderr, "Could not decrypt and verify file %s.\n", PATH);\
 			exit(-1);\
 		}\
