@@ -141,19 +141,27 @@ void create_encfs_directory(const char *encrypted_directory){
 	/* This check is now (in the user-controlled-decryption-operations setting) done by the user on the token.
 	 * So, saving the plaintext path and encrypting only the hash value is enough. The plaintext path has to
 	 * be read and sent to the token before decryption.
+	 * Format in file: "/path/to/folder/encrypted/with/the/password\0xF1E(hash_valuepassword)"
+	 * Format when sending to token: "E(hash_valuepassword)"
 	 */
 	GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_directory)
-	char *hash_value_of_decrypted_directory = compute_hash_value_from_meta_data(decrypted_directory, strlen(decrypted_directory));
+	int hash_value_length;
+	char *hash_value_of_decrypted_directory = compute_hash_value_from_meta_data(decrypted_directory, strlen(decrypted_directory), &hash_value_length);
 	//SEPARATE_STRINGS(encrypted_directory, password, plain_text)
-	SEPARATE_STRINGS(hash_value_of_decrypted_directory, password, plain_text)
+	//SEPARATE_STRINGS does not work here, as the hash value might contain the separator. It is also not needed, as the
+	//token has to know the hash algorithm used anyhow.
+	//SEPARATE_STRINGS(hash_value_of_decrypted_directory, password, plain_text)
+	char plain_text[hash_value_length + strlen(password) + 1];
+	memcpy(plain_text, hash_value_of_decrypted_directory, hash_value_length);
 	free(hash_value_of_decrypted_directory);
+	strcpy(plain_text + hash_value_length, password);
 	//When in top folder, perform asymmetric encryption. Else, just put the password and path
 	//in .password file and let Encfs encrypt it
 	//In the user-controlled-decryption-operations setting, we always want to do the asymmetric encryption.
 	//Else, no control via the token over the decryption operations is given.
 	//if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
 		//sign_and_encrypt(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
-		direct_rsa_encrypt_and_save_to_file(plain_text, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
+		direct_rsa_encrypt_and_save_to_file(plain_text, hash_value_length + strlen(password), OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, PASSWORD_FILE_NAME);
 		//Add meta data to the beginning of the file
 		//Concatenate path
 		LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_file_name)
@@ -165,9 +173,27 @@ void create_encfs_directory(const char *encrypted_directory){
 			READ_FILE(concatenated_path, cipher_text)
 			//pos contains length of read cipher_text, (see macro READ_FILE)
 			cipher_text_length = pos;
-			SEPARATE_STRINGS(decrypted_directory, cipher_text, meta_data_and_cipher_text_local)
-			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(meta_data_and_cipher_text_local, meta_data_and_cipher_text)
+			//Debug
+			int i;
+			printf("Data read to file %s : ", concatenated_path);
+			for(i = 0; i < cipher_text_length; i++){
+				printf("%02X ", cipher_text[i]);
+			}
+			printf("\n");
+			//SEPARATE_STRINGS does not work here, as the cipher text might contain zeros.
+			//SEPARATE_STRINGS(decrypted_directory, cipher_text, meta_data_and_cipher_text_local)
+			meta_data_and_cipher_text = malloc(strlen(decrypted_directory) + 1 + cipher_text_length);
+			memcpy(meta_data_and_cipher_text, decrypted_directory, strlen(decrypted_directory));
+			meta_data_and_cipher_text[strlen(decrypted_directory)] = PATH_SEPARATOR;
+			memcpy(meta_data_and_cipher_text + strlen(decrypted_directory) + 1, cipher_text, cipher_text_length);
 		}
+		//Debug
+		int i;
+		printf("Data going to be written to file %s : ", concatenated_path);
+		for(i = 0; i < strlen(decrypted_directory) + 1 + cipher_text_length; i++){
+			printf("%02X ", meta_data_and_cipher_text[i]);
+		}
+		printf("\n");
 		WRITE_BINARY_DATA_TO_FILE(concatenated_path, meta_data_and_cipher_text, strlen(decrypted_directory) + 1 + cipher_text_length)
 		free(meta_data_and_cipher_text);
 	/*} else {

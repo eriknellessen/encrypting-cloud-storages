@@ -67,22 +67,36 @@ void sign_and_encrypt(const char *data, const char *public_key_fingerprint, cons
 	gpgme_release(gpgme_ctx);
 }
 
-void direct_rsa_encrypt_and_save_to_file(const char *plain_text, const char *public_key_fingerprint, const char *path, const char *file_name){
+//Plain text might contain a hash value which might contain zeros, so plain text length is needed here
+void direct_rsa_encrypt_and_save_to_file(const char *plain_text, int plain_text_length, const char *public_key_fingerprint, const char *path, const char *file_name){
 	size_t cipher_text_length;
-	char *cipher_text = rsa_encrypt(plain_text, public_key_fingerprint, &cipher_text_length);
+	char *cipher_text = rsa_encrypt(plain_text, plain_text_length, public_key_fingerprint, &cipher_text_length);
 
 	//Concatenate path
 	LOCAL_STR_CAT(path, file_name, path_with_file_name)
 	LOCAL_STR_CAT(path_with_file_name, public_key_fingerprint, path_with_file_name_and_public_key_fingerprint)
 	LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
-	
+
+	//Debug
+	int i;
+	printf("Data written to file %s : ", concatenated_path);
+	for(i = 0; i < cipher_text_length; i++){
+		printf("%02X ", cipher_text[i]);
+	}
+	printf("\n");
+
 	WRITE_BINARY_DATA_TO_FILE(concatenated_path, cipher_text, cipher_text_length)
 
 	free(cipher_text);
 }
 
-char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length){
-	return compute_hash_value_from_meta_data_lib_function(meta_data, meta_data_length);
+//hash value might containt zeros, so hash_value_length is needed.
+char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length, int *hash_value_length){
+	return compute_hash_value_from_meta_data_lib_function(meta_data, meta_data_length, hash_value_length);
+}
+
+int get_hash_length(){
+	return get_hash_length_lib_function();
 }
 
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name){

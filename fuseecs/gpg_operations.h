@@ -15,6 +15,8 @@
  */
 #define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
 	size_t length;\
+	/* Debug */\
+	printf("DECRYPT_AND_VERIFY start.\n");\
 	{\
 		gpgme_ctx_t gpgme_ctx;\
 		if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){\
@@ -49,25 +51,49 @@
 		exit(-1);\
 	}\
 	RESULT[length] = 0;\
-	gpgme_free(plain_text);
+	gpgme_free(plain_text);\
+	/* Debug */\
+	printf("DECRYPT_AND_VERIFY end.\n");\
 
 #define DECRYPT_ON_TOKEN(PATH, RESULT) /*Get cipher text from file */\
+	/* Debug */\
+	printf("DECRYPT_ON_TOKEN start.\n");\
 	/* File might contain zeros, so we need the length. It is saved in the 'pos' variable. */\
 	READ_FILE(PATH, file_content)\
+	/* Debug */\
+	{\
+	int i;\
+		printf("Data read from file %s : ", PATH);\
+		for(i = 0; i < pos; i++){\
+			printf("%02X ", file_content[i]);\
+		}\
+		printf("\n");\
+	}\
 	\
 	/* We are decrypting a password here. So we need to strip the path, send it to the\
 	* token, then send the cipher text. */\
 	/* Strip the path */\
-	UNSEPARATE_STRINGS(file_content, pos, meta_data, cipher_text, cipher_text_length)\
+	UNSEPARATE_STRINGS(file_content, pos, meta_data, cipher_text, cipher_text_length_including_trailing_zero)\
+	/* Debug */\
+	{\
+	int i;\
+		printf("Cipher text from file %s : ", PATH);\
+		for(i = 0; i < cipher_text_length_including_trailing_zero - 1; i++){\
+			printf("%02X ", cipher_text[i]);\
+		}\
+		printf("\n");\
+	}\
 	/* Decrypt */\
 	/* TODO: Decryption is not working yet. Additionally, the meta data has to be transferred to the token first. */\
 	char *plain_text;\
-	while(rsa_decrypt_on_token(cipher_text, cipher_text_length, &plain_text) != 0);\
+	while(rsa_decrypt_on_token(cipher_text, cipher_text_length_including_trailing_zero - 1, &plain_text) != 0);\
 	\
-	/* Copy result to the local variable. */\
-	char RESULT[strlen(plain_text) + 1];\
-	strcpy(RESULT, plain_text);\
+	/* Copy result to the local variable. Skip the hash value. */\
+	char RESULT[strlen(plain_text + get_hash_length()) + 1];\
+	strcpy(RESULT, plain_text + get_hash_length());\
 	free(plain_text);\
+	/* Debug */\
+	printf("DECRYPT_ON_TOKEN end.\n");
 
 #define VERIFY_PATH(DATA, PATH, RESULT) UNSEPARATE_STRINGS(DATA, strlen(DATA), path, RESULT, result_length)\
 	if(strcmp(path, PATH)){\
@@ -226,8 +252,9 @@
 	printf("Got the following random password: %s\n", RESULT);
 
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
-void direct_rsa_encrypt_and_save_to_file(const char *plain_text, const char *public_key_fingerprint, const char *path, const char *file_name);
-char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length);
+void direct_rsa_encrypt_and_save_to_file(const char *plain_text, int plain_text_length, const char *public_key_fingerprint, const char *path, const char *file_name);
+char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length, int *hash_value_length);
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name);
+int get_hash_length();
 
 #endif

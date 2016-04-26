@@ -23,4 +23,3 @@ create_mountpoint:
 
 clean:
 	rm -rf $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
-	rm fuseecs

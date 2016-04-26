@@ -72,6 +72,17 @@ int verify_pin(sc_card_t *card){
 int decipher(const u8 *cipher_text, int cipher_text_length, u8 **plain_text, sc_card_t *card){
 	int r;
 	int plain_text_length = cipher_text_length;
+
+	/* Debug */
+	{
+	int i;
+		printf("Cipher text before decryption on token: ");
+		for(i = 0; i < cipher_text_length; i++){
+			printf("%02X ", cipher_text[i]);
+		}
+		printf("\n");
+	}
+
 	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	printf("plain_text_length: %i\n", plain_text_length);
 	*plain_text = malloc(plain_text_length + 1);
