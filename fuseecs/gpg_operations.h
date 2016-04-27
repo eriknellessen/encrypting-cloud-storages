@@ -85,6 +85,10 @@
 	}\
 	/* Decrypt */\
 	/* TODO: Decryption is not working yet. Additionally, the meta data has to be transferred to the token first. */\
+	if(send_meta_data_to_token(meta_data, strlen(meta_data)) != 0){\
+		fprintf(stderr, "Could not send meta data to token.\n");\
+		exit(-1);\
+	}\
 	char *plain_text;\
 	while(rsa_decrypt_on_token(cipher_text, cipher_text_length_including_trailing_zero - 1, &plain_text) != 0);\
 	\
