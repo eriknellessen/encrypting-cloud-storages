@@ -84,7 +84,6 @@
 		printf("\n");\
 	}\
 	/* Decrypt */\
-	/* TODO: Decryption is not working yet. Additionally, the meta data has to be transferred to the token first. */\
 	if(send_meta_data_to_token(meta_data, strlen(meta_data)) != 0){\
 		fprintf(stderr, "Could not send meta data to token.\n");\
 		exit(-1);\
@@ -128,13 +127,18 @@
 #define GET_PASSWORD(PATH, RESULT) GET_FOLDER_NAME_ITERATIVELY(PATH, DECRYPT, decrypted_path)\
 	GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
 
+//TODO: Easiest way: Check, if .password file exists.
 #define GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, DECRYPTED_PATH, RESULT) char *RESULT = NULL;\
 	{\
 		LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
 		APPEND_SLASH_IF_NECESSARY(PATH, path_with_slash_at_the_end)\
 		LOCAL_STR_CAT(path_with_slash_at_the_end, password_file, path_with_password_prefix_and_fingerprint)\
-		LOCAL_STR_CAT(path_with_password_prefix_and_fingerprint, ENCRYPTED_FILE_ENDING, path_with_password_file)\
+		LOCAL_STR_CAT(path_with_password_prefix_and_fingerprint, ENCRYPTED_FILE_ENDING, path_with_encrypted_password_file)\
+		LOCAL_STR_CAT(path_with_slash_at_the_end, PASSWORD_FILE_NAME, path_with_password_file)\
 		if(access(path_with_password_file, F_OK) == 0){\
+			READ_FILE(path_with_password_file, result)\
+			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
+		} else if(access(path_with_encrypted_password_file, F_OK) == 0){\
 			/*SET_PATH_TO_COMPARE_TO(PATH, path_to_compare_to)*/\
 			/*DECRYPT_DATA_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)*/\
 			DECRYPT_DATA_ON_TOKEN_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)\

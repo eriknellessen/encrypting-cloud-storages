@@ -74,6 +74,54 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
 
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
 
+void delete_password_file(const char *path){
+	//Delete password file
+	APPEND_SLASH_IF_NECESSARY(path, path_with_slash_at_the_end)
+	LOCAL_STR_CAT(path_with_slash_at_the_end, PASSWORD_FILE_NAME, path_with_password_file)
+	if(unlink(path_with_password_file) != 0){
+		fprintf(stderr, "Can't delete password file %s\n", path_with_password_file);
+		exit(-1);
+	}
+
+	//Recursive call for all folders in this folder
+	struct dirent *m_dirent;
+
+	DIR *m_dir = opendir(path_with_slash_at_the_end);
+	if(m_dir == NULL){
+		fprintf(stderr, "Can't open %s\n", path_with_slash_at_the_end);
+		exit(-1);
+	}
+
+	while((m_dirent = readdir(m_dir)) != NULL){
+		if(strcmp(m_dirent->d_name, ".") && strcmp(m_dirent->d_name, "..") && strcmp(m_dirent->d_name, DROPBOX_INTERNAL_FILES_DIRECTORY)){
+			struct stat stbuf;
+			
+			LOCAL_STR_CAT(path_with_slash_at_the_end, m_dirent->d_name, path_with_file)
+			printf("start_encfs_for_directory: examining file %s\n", path_with_file);
+			/* lstat is like stat, but does not try to resolve symbolic links.
+			 * Symbolic links can not be resolved at this point, because they
+			 * are still encrypted. See
+			 * http://pubs.opengroup.org/onlinepubs/009695399/functions/lstat.html
+			 */
+			if(lstat(path_with_file, &stbuf) == -1){
+				fprintf(stderr, "Unable to stat file: %s\n", path_with_file) ;
+				exit(-1);
+			}
+
+			if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
+				printf("start_encfs_for_directory: I think, this is a directory!\n");
+				//Directory
+				//Recursive call
+				delete_password_file(path_with_file);
+			}
+		}
+	}
+}
+
+void delete_all_password_files(){
+	delete_password_file(ROOT_DIRECTORY);
+}
+
 void termination_handler(int signum){
 	/* When we call encfs, it forks again and kills the process we created. That is why remembering our spawned
 	 * pids does not help us kill our processes. It is also not possible to get the child processes via pgrep.
@@ -91,6 +139,9 @@ void termination_handler(int signum){
 		//Unmount MOUNT_POINT
 		LOCAL_STR_CAT(FUSERUNMOUNT_COMMAND, MOUNTPOINT_DIRECTORY, fusermount_cmd)
 		system(fusermount_cmd);
+
+		//Delete password files
+		delete_all_password_files();
 
 		exit(0);
 	}
@@ -145,15 +196,16 @@ void create_encfs_directory(const char *encrypted_directory){
 	 * Format when sending to token: "E(hash_valuepassword)"
 	 */
 	GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_directory)
+	SUBSTITUTE_DECRYPTED_DIRECTORY_WITH_MOUNTPOINT_DIRECTORY(decrypted_directory, meta_data)
 	int hash_value_length;
-	char *hash_value_of_decrypted_directory = compute_hash_value_from_meta_data(decrypted_directory, strlen(decrypted_directory), &hash_value_length);
+	char *hash_value_of_meta_data = compute_hash_value_from_meta_data(meta_data, strlen(meta_data), &hash_value_length);
 	//SEPARATE_STRINGS(encrypted_directory, password, plain_text)
 	//SEPARATE_STRINGS does not work here, as the hash value might contain the separator. It is also not needed, as the
 	//token has to know the hash algorithm used anyhow.
-	//SEPARATE_STRINGS(hash_value_of_decrypted_directory, password, plain_text)
+	//SEPARATE_STRINGS(hash_value_of_meta_data, password, plain_text)
 	char plain_text[hash_value_length + strlen(password) + 1];
-	memcpy(plain_text, hash_value_of_decrypted_directory, hash_value_length);
-	free(hash_value_of_decrypted_directory);
+	memcpy(plain_text, hash_value_of_meta_data, hash_value_length);
+	free(hash_value_of_meta_data);
 	strcpy(plain_text + hash_value_length, password);
 	//When in top folder, perform asymmetric encryption. Else, just put the password and path
 	//in .password file and let Encfs encrypt it
@@ -182,19 +234,19 @@ void create_encfs_directory(const char *encrypted_directory){
 			printf("\n");
 			//SEPARATE_STRINGS does not work here, as the cipher text might contain zeros.
 			//SEPARATE_STRINGS(decrypted_directory, cipher_text, meta_data_and_cipher_text_local)
-			meta_data_and_cipher_text = malloc(strlen(decrypted_directory) + 1 + cipher_text_length);
-			memcpy(meta_data_and_cipher_text, decrypted_directory, strlen(decrypted_directory));
-			meta_data_and_cipher_text[strlen(decrypted_directory)] = PATH_SEPARATOR;
-			memcpy(meta_data_and_cipher_text + strlen(decrypted_directory) + 1, cipher_text, cipher_text_length);
+			meta_data_and_cipher_text = malloc(strlen(meta_data) + 1 + cipher_text_length);
+			memcpy(meta_data_and_cipher_text, meta_data, strlen(meta_data));
+			meta_data_and_cipher_text[strlen(meta_data)] = PATH_SEPARATOR;
+			memcpy(meta_data_and_cipher_text + strlen(meta_data) + 1, cipher_text, cipher_text_length);
 		}
 		//Debug
 		int i;
 		printf("Data going to be written to file %s : ", concatenated_path);
-		for(i = 0; i < strlen(decrypted_directory) + 1 + cipher_text_length; i++){
+		for(i = 0; i < strlen(meta_data) + 1 + cipher_text_length; i++){
 			printf("%02X ", meta_data_and_cipher_text[i]);
 		}
 		printf("\n");
-		WRITE_BINARY_DATA_TO_FILE(concatenated_path, meta_data_and_cipher_text, strlen(decrypted_directory) + 1 + cipher_text_length)
+		WRITE_BINARY_DATA_TO_FILE(concatenated_path, meta_data_and_cipher_text, strlen(meta_data) + 1 + cipher_text_length)
 		free(meta_data_and_cipher_text);
 	/*} else {
 		GET_FOLDER_NAME_ITERATIVELY(encrypted_directory, DECRYPT, decrypted_path)
@@ -218,10 +270,10 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	APPEND_SLASH_IF_NECESSARY_REPEATABLE(mount_point_maybe_without_slash, mount_point)
 	
 	//If the folder has not yet been initiated with encrypted password and so on, initiate it
-	LOCAL_STR_CAT(encrypted_directory, ENCFS_CONFIGURATION_FILE, path_with_encfs_file)
-	LOCAL_STR_CAT(path_with_encfs_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_encfs_file_and_own_fingerprint)
-	LOCAL_STR_CAT(path_with_encfs_file_and_own_fingerprint, ENCRYPTED_FILE_ENDING, encrypted_encfs_file)
-	if(access(encrypted_encfs_file, F_OK) == -1){
+	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
+	LOCAL_STR_CAT(path_with_password_file, OWN_PUBLIC_KEY_FINGERPRINT, path_with_password_file_and_own_fingerprint)
+	LOCAL_STR_CAT(path_with_password_file_and_own_fingerprint, ENCRYPTED_FILE_ENDING, encrypted_password_file)
+	if(access(encrypted_password_file, F_OK) == -1){
 		create_encfs_directory(encrypted_directory);
 	}
 	
@@ -229,6 +281,8 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	
 	//If there is an encrypted version of the configuration file, decrypt it.
 	//Decrypt data, check signature, check path
+	//Skip this. As we wish to have only one decryption, we do not solve this problem here, but leave this to encfs.
+	/*
 	if(access(encrypted_encfs_file, F_OK) == 0){
 		LOCAL_STR_CAT(ENCFS_CONFIGURATION_FILE, OWN_PUBLIC_KEY_FINGERPRINT, encfs_configuration_file_with_fingerprint)
 		char *path_to_compare_to = NULL;
@@ -242,18 +296,17 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		//Write data to file
 		WRITE_STRING_TO_FILE(path_with_encfs_file, encfs_configuration_data)
 		
-		/*
 		//Debug
-		LOCAL_STR_CAT("/bin/bash -c \"cp ", encrypted_directory, cp_cmd_without_file)
-		LOCAL_STR_CAT(cp_cmd_without_file, ENCFS_CONFIGURATION_FILE, cp_cmd_without_file_ending)
-		LOCAL_STR_CAT(cp_cmd_without_file_ending, "{,.old}", cp_cmd_without_ending_quotation_mark)
-		LOCAL_STR_CAT(cp_cmd_without_ending_quotation_mark, "\"", cp_cmd)
-		if(system(cp_cmd)){
-			fprintf(stderr, "Could not copy encfs configuration file with the following command: %s\n", cp_cmd);
-			exit(-1);
-		}
-		*/
+// 		LOCAL_STR_CAT("/bin/bash -c \"cp ", encrypted_directory, cp_cmd_without_file)
+// 		LOCAL_STR_CAT(cp_cmd_without_file, ENCFS_CONFIGURATION_FILE, cp_cmd_without_file_ending)
+// 		LOCAL_STR_CAT(cp_cmd_without_file_ending, "{,.old}", cp_cmd_without_ending_quotation_mark)
+// 		LOCAL_STR_CAT(cp_cmd_without_ending_quotation_mark, "\"", cp_cmd)
+// 		if(system(cp_cmd)){
+// 			fprintf(stderr, "Could not copy encfs configuration file with the following command: %s\n", cp_cmd);
+// 			exit(-1);
+// 		}
 	}
+	*/
 
 	//Get decrypted password
 	GET_PASSWORD(encrypted_directory, password)
@@ -266,7 +319,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	 * by using getfacl on the encrypted folder. It prevents the Dropbox user from reading anything in the encrypted
 	 * folder.
 	 */
-	LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
+	//LOCAL_STR_CAT(encrypted_directory, PASSWORD_FILE_NAME, path_with_password_file)
 	WRITE_STRING_TO_FILE(path_with_password_file, password)
 	free(password);
 	
@@ -302,6 +355,8 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	/* TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
 	 * Maybe this problem only occurs when there are still encfs processes running (noticed this once).
 	 */
+	//Skip this, see above.
+	/*
 	if(access(encrypted_encfs_file, F_OK) != 0){
 		//Wait for encfs to create the file
 		wait_until_file_is_created_and_has_content(path_with_encfs_file);
@@ -313,6 +368,7 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		//Encrypt the data and write to file
 		sign_and_encrypt(path_and_encfs_configuration_data, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, ENCFS_CONFIGURATION_FILE);
 	}
+	*/
 
 	free(encrypted_directory);
 	free(mount_point);
@@ -425,21 +481,21 @@ void start_encfs_for_directory(char *encrypted_directory_maybe_without_slash){
 	
 	//Start encfs for the correct folder.
 	//Get correct directory name
-	 if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
+	if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
 		//Debug
 		printf("Calling start_encfs from start_encfs_for_directory.\n");
 		
-	 	start_encfs(encrypted_directory, DECRYPTED_DIRECTORY);
-	 } else {
+		start_encfs(encrypted_directory, DECRYPTED_DIRECTORY);
+	} else {
 	 	GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_folder_name)
 		//Debug
 		printf("Calling start_encfs from start_encfs_for_directory.\n");
 		
-	 	start_encfs(encrypted_directory, decrypted_folder_name);
-	 }
-	
+		start_encfs(encrypted_directory, decrypted_folder_name);
+	}
+
 	struct dirent *m_dirent;
-	
+
 	DIR *m_dir = opendir(encrypted_directory);
 	if(m_dir == NULL){
 		fprintf(stderr, "Can't open %s\n", encrypted_directory);
