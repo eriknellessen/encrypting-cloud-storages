@@ -47,5 +47,15 @@ if(${PCSCD} STREQUAL "PCSCD-NOTFOUND")
 	message(FATAL_ERROR "Could not find pcscd")
 endif()
 
+find_library(ASSUAN_LIBRARY assuan)
+if(${ASSUAN_LIBRARY} STREQUAL "ASSUAN_LIBRARY-NOTFOUND")
+	message(FATAL_ERROR "Could not find libassuan")
+endif()
+
+find_path(ASSUAN_INCLUDE_DIR assuan.h)
+if(${ASSUAN_INCLUDE_DIR} STREQUAL "ASSUAN_INCLUDE_DIR-NOTFOUND")
+	message(FATAL_ERROR "Could not find libassuan header files")
+endif()
+
 add_subdirectory(fuseecs)
 add_subdirectory(share_a_folder)

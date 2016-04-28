@@ -5,6 +5,7 @@
 #include "libopensc/cards.h"
 #include "libopensc/log.h"
 #include "access_token.h"
+#include <assuan.h>
 
 int connect_to_card(sc_card_t **card){
 	sc_context_t *ctx = NULL;
@@ -56,15 +57,73 @@ int set_rsa_decryption_security_environment(sc_card_t *card){
 	return 0;
 }
 
+u8 *pin;
+size_t pin_length;
+int pin_set = 0;
+static gpg_error_t getpin_cb(void *opaque, const void *buffer, size_t length){
+	pin = malloc(length);
+	memcpy(pin, buffer, length);
+	pin_length = length;
+	pin_set = 1;
+	//Debug
+	printf("PIN in getpin_cb: ");
+	int i;
+	for(i = 0; i < length; i++){
+		printf("%c", pin[i]);
+	}
+	printf("\n");
+
+	return 0;
+}
+
+int get_pin(){
+	gpg_error_t err;
+	assuan_context_t ctx;
+	pin_set = 0;
+
+	err = assuan_new(&ctx);
+	if(err){
+		fprintf(stderr, "Could not create assuan context.\n");
+		return -1;
+	}
+
+	//Debug
+	assuan_set_log_stream(ctx, stderr);
+
+	const char *argv[1] = {"pinentry"};
+	err = assuan_pipe_connect(ctx, "/usr/bin/pinentry", argv, NULL, NULL, NULL, 0);
+	if(err){
+		fprintf(stderr, "Could not connect to pinentry: %s.\n", gpg_strerror (err));
+		return -1;
+	}
+
+	err = assuan_transact(ctx, "GETPIN", getpin_cb, NULL, NULL, NULL, NULL, NULL);
+	if(err){
+		fprintf(stderr, "Could not get PIN (assuan_transact failed).\n");
+		return -1;
+	}
+
+	while(pin_set == 0);
+
+	assuan_release(ctx);
+	return 0;
+}
+
 int verify_pin(sc_card_t *card){
 	int tries_left, r;
-	//TODO: Get PIN from user/card reader
-	const u8 pin_value [] = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36};
-	r = sc_verify(card, SC_AC_CHV, 2, pin_value, sizeof pin_value, &tries_left);
+	r = get_pin();
+	if(r){
+		fprintf(stderr, "Could not get PIN from user.\n");
+		return -1;
+	}
+
+	r = sc_verify(card, SC_AC_CHV, 2, pin, pin_length, &tries_left);
 	if(r){
 		fprintf(stderr, "Could not verify PIN: %s\n", sc_strerror(r));
 		return -1;
 	}
+
+	free(pin);
 
 	return 0;
 }
