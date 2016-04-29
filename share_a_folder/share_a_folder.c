@@ -26,6 +26,7 @@ int main(int argc, char *argv[])
 
 	STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_folder, encrypted_folder_name)
 	//Share password file
+	//TODO: Direct RSA encryption here
 	{
 		//Read password
 		LOCAL_STR_CAT(encrypted_folder, PASSWORD_FILE_NAME, path_to_password_file)
@@ -36,6 +37,7 @@ int main(int argc, char *argv[])
 	}
 
 	//Share encfs configuration file
+	//TODO: Do not encrypt here, but enable access to it in fuseecs.c
 	{
 		//Read encfs configuration file
 		LOCAL_STR_CAT(encrypted_folder, ENCFS_CONFIGURATION_FILE, path_to_encfs_configuration_file)
@@ -46,6 +48,7 @@ int main(int argc, char *argv[])
 	}
 
 	//Share folder name
+	//TODO: Do not encrypt here, meta data is visible anyhow
 	{
 		STRIP_UPPER_DIRECTORIES_AND_SLASH(decrypted_folder, plain_folder_name_maybe_with_ending_slash)
 		REMOVE_SLASH_IF_NECESSARY_REPEATABLE(plain_folder_name_maybe_with_ending_slash, plain_folder_name)

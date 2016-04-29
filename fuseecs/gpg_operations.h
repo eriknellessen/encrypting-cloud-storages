@@ -260,6 +260,8 @@
 	printf("Got the following random password: %s\n", RESULT);
 
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
+void sign(const char *data, const char *path, const char *file_name);
+void verify_signature_and_path(const char *path, const char *path_to_compare_to, const char *file_name);
 void direct_rsa_encrypt_and_save_to_file(const char *plain_text, int plain_text_length, const char *public_key_fingerprint, const char *path, const char *file_name);
 char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length, int *hash_value_length);
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name);

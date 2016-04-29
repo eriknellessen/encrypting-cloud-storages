@@ -443,14 +443,13 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 	//Debug
 	printf("Step 3 completed. encrypted_path: %s\n", encrypted_path);
 
-	LOCAL_STR_CAT(DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, do_not_decrypt_file_name_with_fingerprint)
-	LOCAL_STR_CAT(encrypted_path, do_not_decrypt_file_name_with_fingerprint, encrypted_path_with_file_name)
+	LOCAL_STR_CAT(encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, encrypted_path_with_file_name)
 	LOCAL_STR_CAT(encrypted_path_with_file_name, ENCRYPTED_FILE_ENDING, path_to_do_not_decrypt_file)
 	if(access(path_to_do_not_decrypt_file, F_OK) == 0){
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_path, encrypted_path, do_not_decrypt_file_name_with_fingerprint, result)
+		verify_signature_and_path(encrypted_path, encrypted_path, encrypted_path_with_file_name);
 	} else {
 		SEPARATE_STRINGS(encrypted_path, "", encrypted_path_with_separator)
-		sign_and_encrypt(encrypted_path_with_separator, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME);
+		sign(encrypted_path_with_separator, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME);
 	}
 	//Debug
 	printf("Step 4 completed.\n");
