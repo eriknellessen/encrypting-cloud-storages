@@ -24,39 +24,75 @@ int main(int argc, char *argv[])
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, encrypted_folder)
 	}
 
-	STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_folder, encrypted_folder_name)
+	printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+
+	STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(decrypted_folder, meta_data)
 	//Share password file
 	//TODO: Direct RSA encryption here
 	{
 		//Read password
 		LOCAL_STR_CAT(encrypted_folder, PASSWORD_FILE_NAME, path_to_password_file)
 		READ_FILE(path_to_password_file, password)
-		//Encrypt password with chosen public key
-		SEPARATE_STRINGS(encrypted_folder_name, password, path_with_password)
-		sign_and_encrypt(path_with_password, fingerprint, encrypted_folder, PASSWORD_FILE_NAME);
+		int hash_value_length;
+		char *hash_value_of_meta_data = compute_hash_value_from_meta_data(meta_data, strlen(meta_data), &hash_value_length);
+		char plain_text[hash_value_length + strlen(password) + 1];
+		memcpy(plain_text, hash_value_of_meta_data, hash_value_length);
+		free(hash_value_of_meta_data);
+		strcpy(plain_text + hash_value_length, password);
+		direct_rsa_encrypt_and_save_to_file(plain_text, hash_value_length + strlen(password), fingerprint, encrypted_folder, PASSWORD_FILE_NAME);
+		//Add meta data to the beginning of the file
+		//Concatenate path
+		LOCAL_STR_CAT(encrypted_folder, PASSWORD_FILE_NAME, path_with_file_name)
+		LOCAL_STR_CAT(path_with_file_name, fingerprint, path_with_file_name_and_public_key_fingerprint)
+		LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
+		long cipher_text_length;
+		char *meta_data_and_cipher_text = NULL;
+		{
+			READ_FILE(concatenated_path, cipher_text)
+			//pos contains length of read cipher_text, (see macro READ_FILE)
+			cipher_text_length = pos;
+			//Debug
+			int i;
+			printf("Data read from file %s : ", concatenated_path);
+			for(i = 0; i < cipher_text_length; i++){
+				printf("%02X ", cipher_text[i]);
+			}
+			printf("\n");
+			//SEPARATE_STRINGS does not work here, as the cipher text might contain zeros.
+			//SEPARATE_STRINGS(decrypted_directory, cipher_text, meta_data_and_cipher_text_local)
+			meta_data_and_cipher_text = malloc(strlen(meta_data) + 1 + cipher_text_length);
+			memcpy(meta_data_and_cipher_text, meta_data, strlen(meta_data));
+			meta_data_and_cipher_text[strlen(meta_data)] = PATH_SEPARATOR;
+			memcpy(meta_data_and_cipher_text + strlen(meta_data) + 1, cipher_text, cipher_text_length);
+		}
+		//Debug
+		int i;
+		printf("Data going to be written to file %s : ", concatenated_path);
+		for(i = 0; i < strlen(meta_data) + 1 + cipher_text_length; i++){
+			printf("%02X ", meta_data_and_cipher_text[i]);
+		}
+		printf("\n");
+		WRITE_BINARY_DATA_TO_FILE(concatenated_path, meta_data_and_cipher_text, strlen(meta_data) + 1 + cipher_text_length)
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+		free(meta_data_and_cipher_text);
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
 	}
 
-	//Share encfs configuration file
-	//TODO: Do not encrypt here, but enable access to it in fuseecs.c
-	{
-		//Read encfs configuration file
-		LOCAL_STR_CAT(encrypted_folder, ENCFS_CONFIGURATION_FILE, path_to_encfs_configuration_file)
-		READ_FILE(path_to_encfs_configuration_file, encfs_configuration_data)
-		//Encrypt encfs configuration file with chosen public key
-		SEPARATE_STRINGS(encrypted_folder_name, encfs_configuration_data, path_with_encfs_configuration_data)
-		sign_and_encrypt(path_with_encfs_configuration_data, fingerprint, encrypted_folder, ENCFS_CONFIGURATION_FILE);
-	}
+	//We do not encrypt the encfs configuration file anymore, so we have only one decryption for each folder.
 
 	//Share folder name
-	//TODO: Do not encrypt here, meta data is visible anyhow
 	{
-		STRIP_UPPER_DIRECTORIES_AND_SLASH(decrypted_folder, plain_folder_name_maybe_with_ending_slash)
-		REMOVE_SLASH_IF_NECESSARY_REPEATABLE(plain_folder_name_maybe_with_ending_slash, plain_folder_name)
-		free(plain_folder_name_maybe_with_ending_slash);
-		SEPARATE_STRINGS(encrypted_folder_name, plain_folder_name, encrypted_and_decrypted_folder_name)
-		free(plain_folder_name);
-		sign_and_encrypt(encrypted_and_decrypted_folder_name, fingerprint, encrypted_folder, DECRYPTED_FOLDER_NAME_FILE_NAME);
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+		STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_folder, encrypted_folder_name)
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+		SEPARATE_STRINGS(encrypted_folder_name, meta_data, encrypted_and_decrypted_folder_name)
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+		sign(encrypted_and_decrypted_folder_name, encrypted_folder, DECRYPTED_FOLDER_NAME_FILE_NAME);
 	}
+
+	printf("File: %s, Line: %i\n", __FILE__, __LINE__);
 
 	//If encrypted_folder starts with the root directory, do not show the root directory to the user
 	char *encrypted_folder_to_show_to_user;

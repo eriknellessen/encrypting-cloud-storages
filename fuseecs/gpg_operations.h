@@ -61,6 +61,7 @@
 	/* File might contain zeros, so we need the length. It is saved in the 'pos' variable. */\
 	READ_FILE(PATH, file_content)\
 	/* Debug */\
+	/*\
 	{\
 	int i;\
 		printf("Data read from file %s : ", PATH);\
@@ -69,12 +70,14 @@
 		}\
 		printf("\n");\
 	}\
+	*/\
 	\
 	/* We are decrypting a password here. So we need to strip the path, send it to the\
 	* token, then send the cipher text. */\
 	/* Strip the path */\
 	UNSEPARATE_STRINGS(file_content, pos, meta_data, cipher_text, cipher_text_length_including_trailing_zero)\
 	/* Debug */\
+	/*\
 	{\
 	int i;\
 		printf("Cipher text from file %s : ", PATH);\
@@ -83,6 +86,7 @@
 		}\
 		printf("\n");\
 	}\
+	*/\
 	/* Decrypt */\
 	if(send_meta_data_to_token(meta_data, strlen(meta_data)) != 0){\
 		fprintf(stderr, "Could not send meta data to token.\n");\
@@ -127,7 +131,6 @@
 #define GET_PASSWORD(PATH, RESULT) GET_FOLDER_NAME_ITERATIVELY(PATH, DECRYPT, decrypted_path)\
 	GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)
 
-//TODO: Easiest way: Check, if .password file exists.
 #define GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, DECRYPTED_PATH, RESULT) char *RESULT = NULL;\
 	{\
 		LOCAL_STR_CAT(PASSWORD_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, password_file)\
@@ -259,9 +262,8 @@
 	/* Debug */\
 	printf("Got the following random password: %s\n", RESULT);
 
-void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
 void sign(const char *data, const char *path, const char *file_name);
-void verify_signature_and_path(const char *path, const char *path_to_compare_to, const char *file_name);
+char *verify_signature_and_path(const char *path, const char *path_to_compare_to, const char *file_name);
 void direct_rsa_encrypt_and_save_to_file(const char *plain_text, int plain_text_length, const char *public_key_fingerprint, const char *path, const char *file_name);
 char *compute_hash_value_from_meta_data(const char *meta_data, int meta_data_length, int *hash_value_length);
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name);

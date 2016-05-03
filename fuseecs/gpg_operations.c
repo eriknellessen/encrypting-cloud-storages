@@ -4,69 +4,6 @@
 
 #include "direct_asymmetric_encryption/direct_rsa_encryption.h"
 
-//TODO: Do not do hybrid encryption, only do asymmetric encryption. Else, we only see the data encryption key on the token.
-void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name){
-	gpgme_ctx_t gpgme_ctx;
-	if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not create gpg context.\n");
-		exit(-1);
-	}
-
-	gpgme_key_t gpgme_recipient_key;
-	if(gpgme_get_key(gpgme_ctx, public_key_fingerprint, &gpgme_recipient_key, 0) != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not get the recipient key from GPGME.\n");
-		exit(-1);
-	}
-	gpgme_key_t gpgme_recipients[] = {gpgme_recipient_key, NULL};
-	
-	gpgme_key_t gpgme_signer_key;
-	if(gpgme_get_key(gpgme_ctx, OWN_PUBLIC_KEY_FINGERPRINT, &gpgme_signer_key, 0) != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not get the signer key from GPGME.\n");
-		exit(-1);
-	}
-	if(gpgme_signers_add(gpgme_ctx, gpgme_signer_key) != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not add own key to the signers list.\n");
-		exit(-1);
-	}
-
-	gpgme_data_t gpgme_plaintext_data;
-	if(gpgme_data_new_from_mem(&gpgme_plaintext_data, data, strlen(data), 0) != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not create GPGME data handle from given plaintext.\n");
-		exit(-1);
-	}
-
-	gpgme_data_t gpgme_encrypted_data;
-	if(gpgme_data_new(&gpgme_encrypted_data) != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not create GPGME data handle for encrypted data.\n");
-		exit(-1);
-	}
-
-	//TODO: Find out, why gpgme gets stuck here. gpg2 works like a charm doing such operations.
-	//For now, we are skipping the signature
-	//int r = gpgme_op_encrypt_sign(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data);
-	int r = gpgme_op_encrypt(gpgme_ctx, gpgme_recipients, 0, gpgme_plaintext_data, gpgme_encrypted_data);
-	if(r != GPG_ERR_NO_ERROR){
-		fprintf(stderr, "Could not encrypt and sign plaintext. %s %s\n", gpgme_strsource(r), gpgme_strerror(r));
-		exit(-1);
-	}
-	gpgme_signers_clear(gpgme_ctx);
-
-	//Get encrypted data
-	size_t encrypted_data_size;
-	char *encrypted_data = gpgme_data_release_and_get_mem(gpgme_encrypted_data, &encrypted_data_size);
-	
-	//Concatenate path
-	LOCAL_STR_CAT(path, file_name, path_with_file_name)
-	LOCAL_STR_CAT(path_with_file_name, public_key_fingerprint, path_with_file_name_and_public_key_fingerprint)
-	LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
-	
-	WRITE_BINARY_DATA_TO_FILE(concatenated_path, encrypted_data, encrypted_data_size)
-	
-	gpgme_free(encrypted_data);
-	gpgme_data_release(gpgme_plaintext_data);
-	gpgme_release(gpgme_ctx);
-}
-
 //We do not encrypt here, because we do not want to have two decryption operations to decrypt one folder
 void sign(const char *data, const char *path, const char *file_name){
 	gpgme_ctx_t gpgme_ctx;
@@ -121,7 +58,7 @@ void sign(const char *data, const char *path, const char *file_name){
 }
 
 //We do not encrypt here, because we do not want to have two decryption operations to decrypt one folder
-void verify_signature_and_path(const char *path, const char *path_to_compare_to, const char *file_name){
+char *verify_signature_and_path(const char *path, const char *path_to_compare_to, const char *file_name){
 	//Concatenate path
 	LOCAL_STR_CAT(path, file_name, path_with_file_name)
 	LOCAL_STR_CAT(path_with_file_name, ENCRYPTED_FILE_ENDING, concatenated_path)
@@ -151,7 +88,7 @@ void verify_signature_and_path(const char *path, const char *path_to_compare_to,
 
 	size_t signed_data_size;
 	char *signed_data_without_zero_at_the_end = gpgme_data_release_and_get_mem(gpgme_signed_data, &signed_data_size);
-	char signed_data [signed_data_size + 1];
+	char *signed_data = malloc(signed_data_size + 1);
 	memcpy(signed_data, signed_data_without_zero_at_the_end, signed_data_size);
 	signed_data [signed_data_size] = 0;
 	gpgme_free(signed_data_without_zero_at_the_end);
@@ -161,6 +98,8 @@ void verify_signature_and_path(const char *path, const char *path_to_compare_to,
 
 	gpgme_data_release(gpgme_signature);
 	gpgme_release(gpgme_ctx);
+
+	return signed_data;
 }
 
 //Plain text might contain a hash value which might contain zeros, so plain text length is needed here
@@ -174,12 +113,14 @@ void direct_rsa_encrypt_and_save_to_file(const char *plain_text, int plain_text_
 	LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
 
 	//Debug
+	/*
 	int i;
 	printf("Data written to file %s : ", concatenated_path);
 	for(i = 0; i < cipher_text_length; i++){
 		printf("%02X ", cipher_text[i]);
 	}
 	printf("\n");
+	*/
 
 	WRITE_BINARY_DATA_TO_FILE(concatenated_path, cipher_text, cipher_text_length)
 
@@ -196,15 +137,14 @@ int get_hash_length(){
 }
 
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name){
-	LOCAL_STR_CAT(file_name, OWN_PUBLIC_KEY_FINGERPRINT, file_name_with_fingerprint)
-	LOCAL_STR_CAT(encrypted_directory, file_name_with_fingerprint, path_to_file_without_file_ending)
+	LOCAL_STR_CAT(encrypted_directory, file_name, path_to_file_without_file_ending)
 	LOCAL_STR_CAT(path_to_file_without_file_ending, ENCRYPTED_FILE_ENDING, path_to_file)
 	if(access(path_to_file, F_OK) == 0){
 		if(!strcmp(file_name, DECRYPTED_FOLDER_NAME_FILE_NAME)){
 			STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_directory, encrypted_directory_name)
-			DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_directory_name, file_name_with_fingerprint, result)
+			free(verify_signature_and_path(encrypted_directory, encrypted_directory_name, file_name));
 		} else {
-			DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_directory, file_name_with_fingerprint, result)
+			free(verify_signature_and_path(encrypted_directory, encrypted_directory, file_name));
 		}
 		return 1;
 	} else {

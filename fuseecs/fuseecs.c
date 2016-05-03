@@ -44,7 +44,7 @@
 #include "data_operations.h"
 #include "gpg_operations.h"
 
-const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FILE_NAME, ENCFS_CONFIGURATION_FILE};
+const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FILE_NAME};
 
 /* Dropbox does not do the synchronisation automatically anymore. We can make it by choosing
  * stop synchronisation and then start synchronisation.
@@ -78,9 +78,12 @@ void delete_password_file(const char *path){
 	//Delete password file
 	APPEND_SLASH_IF_NECESSARY(path, path_with_slash_at_the_end)
 	LOCAL_STR_CAT(path_with_slash_at_the_end, PASSWORD_FILE_NAME, path_with_password_file)
-	if(unlink(path_with_password_file) != 0){
-		fprintf(stderr, "Can't delete password file %s\n", path_with_password_file);
-		exit(-1);
+
+	if(access(path_with_password_file, F_OK) == 0){
+		if(unlink(path_with_password_file) != 0){
+			fprintf(stderr, "Can't delete password file %s\n", path_with_password_file);
+			exit(-1);
+		}
 	}
 
 	//Recursive call for all folders in this folder
@@ -97,7 +100,7 @@ void delete_password_file(const char *path){
 			struct stat stbuf;
 			
 			LOCAL_STR_CAT(path_with_slash_at_the_end, m_dirent->d_name, path_with_file)
-			printf("start_encfs_for_directory: examining file %s\n", path_with_file);
+			printf("delete_password_file: examining file %s\n", path_with_file);
 			/* lstat is like stat, but does not try to resolve symbolic links.
 			 * Symbolic links can not be resolved at this point, because they
 			 * are still encrypted. See
@@ -109,7 +112,7 @@ void delete_password_file(const char *path){
 			}
 
 			if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
-				printf("start_encfs_for_directory: I think, this is a directory!\n");
+				printf("delete_password_file: I think, this is a directory!\n");
 				//Directory
 				//Recursive call
 				delete_password_file(path_with_file);
@@ -379,6 +382,8 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 
 //encrypted_directory should be full path.
 //Is called for encrypted_directory being a directory containing a DECRYPTED_FOLDER_NAME_FILE_NAME
+//TODO: Not started, when Dropbox creates the folder when we are already running.
+//TODO: The directory is not mounted correctly. It is mounted to DECRYPTED_DIRECTORY, when it should be one directory below.
 void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 	//Debug
 	printf("start_encfs_for_shared_directory started. encrypted_directory: %s\n", encrypted_directory);
@@ -397,10 +402,8 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 	}
 	char *decrypted_folder_name = NULL;
 	{
-		LOCAL_STR_CAT(DECRYPTED_FOLDER_NAME_FILE_NAME, OWN_PUBLIC_KEY_FINGERPRINT, decrypted_folder_name_file_with_fingerprint)
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, encrypted_folder_name, decrypted_folder_name_file_with_fingerprint, decrypted_folder_name_local)
-		//Debug
-		printf("decrypted_folder_name_local: %s\n", decrypted_folder_name_local);
+		char *signed_data = verify_signature_and_path(encrypted_directory, encrypted_folder_name, DECRYPTED_FOLDER_NAME_FILE_NAME);
+		UNSEPARATE_STRINGS(signed_data, strlen(signed_data), not_needed, decrypted_folder_name_local, decrypted_folder_name_local_length)
 		free(encrypted_folder_name);
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_folder_name_local, decrypted_folder_name)
 	}
@@ -443,13 +446,19 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 	//Debug
 	printf("Step 3 completed. encrypted_path: %s\n", encrypted_path);
 
+	/* TODO: After signing, the reader will be in exclusive mode, because gpg locks it.
+	 * See for example: https://lists.gnupg.org/pipermail/gnupg-devel/2015-August/030246.html
+	 */
 	LOCAL_STR_CAT(encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME, encrypted_path_with_file_name)
 	LOCAL_STR_CAT(encrypted_path_with_file_name, ENCRYPTED_FILE_ENDING, path_to_do_not_decrypt_file)
 	if(access(path_to_do_not_decrypt_file, F_OK) == 0){
-		verify_signature_and_path(encrypted_path, encrypted_path, encrypted_path_with_file_name);
+		verify_signature_and_path(encrypted_path, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME);
 	} else {
 		SEPARATE_STRINGS(encrypted_path, "", encrypted_path_with_separator)
 		sign(encrypted_path_with_separator, encrypted_path, DO_NOT_DECRYPT_THIS_DIRECTORY_FILE_NAME);
+		//TODO: Test, if this works as expected.
+		printf("PLEASE PROVIDE THE READER IN 'NOT EXCLUSIVE' MODE AND PRESS ENTER!\n");
+		getchar();
 	}
 	//Debug
 	printf("Step 4 completed.\n");
@@ -492,6 +501,10 @@ void start_encfs_for_directory(char *encrypted_directory_maybe_without_slash){
 		
 		start_encfs(encrypted_directory, decrypted_folder_name);
 	}
+
+	//Wait, until the encfs process has started up
+	//TODO: Better synchronisation.
+	sleep(2);
 
 	struct dirent *m_dirent;
 
@@ -648,8 +661,7 @@ static void *wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_direc
 	char *relative_encrypted_directory_maybe_without_slash = (char *) relative_encrypted_directory_maybe_without_slash_void_pointer;
 	APPEND_SLASH_IF_NECESSARY(relative_encrypted_directory_maybe_without_slash, relative_encrypted_directory)
 	LOCAL_STR_CAT(ROOT_DIRECTORY, relative_encrypted_directory, encrypted_directory)
-	LOCAL_STR_CAT(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME, encrypted_directory_without_fingerprint)
-	LOCAL_STR_CAT(encrypted_directory_without_fingerprint, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory_without_file_ending)
+	LOCAL_STR_CAT(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME, encrypted_directory_without_file_ending)
 	LOCAL_STR_CAT(encrypted_directory_without_file_ending, ENCRYPTED_FILE_ENDING, encrypted_directory_with_file_name)
 	//TODO: Should we also wait, until Dropbox has completed writing to the file?
 	wait_until_file_is_created_and_has_content(encrypted_directory_with_file_name);
@@ -686,6 +698,7 @@ static int ecs_mkdir(const char *path, mode_t mode)
 			//Not needed, just for compiler
 			pthread_t thread;
 
+			printf("Will wait for Dropbox.\n");
 			pthread_create(&thread, NULL, wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory, not_const_path);
 		}
 	} else {

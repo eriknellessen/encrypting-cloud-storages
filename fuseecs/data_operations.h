@@ -4,7 +4,7 @@
 #include <string.h>
 #include "configuration.h"
 
-#define NUMBER_OF_FORBIDDEN_FILE_NAMES 2
+#define NUMBER_OF_FORBIDDEN_FILE_NAMES 1
 extern const char *Forbidden_file_names[];
 
 #define STRING 0

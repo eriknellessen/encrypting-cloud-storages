@@ -25,6 +25,12 @@ sed -i '/CMAKE_INSTALL_FULL_BINDIR=/c\CMAKE_INSTALL_FULL_BINDIR='$CMAKE_INSTALL_
 sed -i '/CMAKE_INSTALL_FULL_LIBDIR=/c\CMAKE_INSTALL_FULL_LIBDIR='$CMAKE_INSTALL_FULL_LIBDIR start_fuseecs.sh
 printf "done.\n"
 
+#Configure start_share_a_folder.sh
+printf "Configuring start_fuseecs.sh ... "
+sed -i '/CMAKE_INSTALL_FULL_BINDIR=/c\CMAKE_INSTALL_FULL_BINDIR='$CMAKE_INSTALL_FULL_BINDIR ../share_a_folder/start_share_a_folder.sh
+sed -i '/CMAKE_INSTALL_FULL_LIBDIR=/c\CMAKE_INSTALL_FULL_LIBDIR='$CMAKE_INSTALL_FULL_LIBDIR ../share_a_folder/start_share_a_folder.sh
+printf "done.\n"
+
 #Configure configuration.h
 printf "Configuring configuration.h ...\n"
 sed -i '/#define ACCESS_USER_ID /c\#define ACCESS_USER_ID '`echo $UID` configuration.h
