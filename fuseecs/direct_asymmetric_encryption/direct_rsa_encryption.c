@@ -28,7 +28,7 @@ char *get_public_key_from_gpg(const char *public_key_fingerprint){
 	gpgme_ctx_t ctx;
 	gpgme_data_t public_key_data;
 	size_t length;
-	//TODO: Not needed, when called from fuseecs
+
 	gpgme_check_version(NULL);
 
 	r = gpgme_new(&ctx);
@@ -254,7 +254,6 @@ char *rsa_encrypt(const char *plain_text, int plain_text_length, const char *pub
 }
 
 char *compute_hash_value_from_meta_data_lib_function(const char *meta_data, int meta_data_length, int *hash_value_length){
-	//TODO: Printf debugging here.
 	*hash_value_length = gcry_md_get_algo_dlen(HASH_ALGORITHM);
 	printf("hash_value_length: %i\n", *hash_value_length);
 	char *hash_value = malloc(*hash_value_length);
@@ -277,17 +276,3 @@ char *compute_hash_value_from_meta_data_lib_function(const char *meta_data, int 
 int get_hash_length_lib_function(){
 	return gcry_md_get_algo_dlen(HASH_ALGORITHM);
 }
-
-// int main(int argc, char *argv []){
-// 	size_t cipher_text_length;
-// 	unsigned char *cipher_text = rsa_encrypt("00010203040506070809101112131415", "FD654C6F", &cipher_text_length);
-// 	printf("cipher_text (%i bytes): ", cipher_text_length);
-// 	int i;
-// 	for(i = 0; i < cipher_text_length; i++){
-// 		printf("%c", cipher_text[i]);
-// 	}
-// 	printf("\n");
-// 	free(cipher_text);
-// 
-// 	return 0;
-// }

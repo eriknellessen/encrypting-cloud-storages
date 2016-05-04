@@ -28,7 +28,6 @@ int main(int argc, char *argv[])
 
 	STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(decrypted_folder, meta_data)
 	//Share password file
-	//TODO: Direct RSA encryption here
 	{
 		//Read password
 		LOCAL_STR_CAT(encrypted_folder, PASSWORD_FILE_NAME, path_to_password_file)

@@ -10,51 +10,6 @@
 #define ENCRYPT 0
 #define DECRYPT 1
 
-/* TODO: Check, if the signature has been made with the expected key. If we do not check this, the cloud storage
- * provider could place the data signed with any trusted key in our key ring in our cloud storage folder.
- */
-#define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
-	size_t length;\
-	/* Debug */\
-	printf("DECRYPT_AND_VERIFY start.\n");\
-	{\
-		gpgme_ctx_t gpgme_ctx;\
-		if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){\
-			fprintf(stderr, "Could not create gpg context.\n");\
-			exit(-1);\
-		}\
-		gpgme_data_t gpgme_encrypted_data;\
-		if(gpgme_data_new_from_file(&gpgme_encrypted_data, PATH, 1) != GPG_ERR_NO_ERROR){\
-			fprintf(stderr, "Could not read encrypted data from file %s.\n", PATH);\
-			exit(-1);\
-		}\
-		gpgme_data_t gpgme_decrypted_data;\
-		if(gpgme_data_new(&gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
-			fprintf(stderr, "Could not create GPGME data handle for decrypted data.\n");\
-			exit(-1);\
-		}\
-		/* TODO: Find out, why gpgme gets stuck when signing with a token. For now, we are skipping the verifying. */\
-		/*if(gpgme_op_decrypt_verify(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\*/\
-		if(gpgme_op_decrypt(gpgme_ctx, gpgme_encrypted_data, gpgme_decrypted_data) != GPG_ERR_NO_ERROR){\
-			fprintf(stderr, "Could not decrypt and verify file %s.\n", PATH);\
-			exit(-1);\
-		}\
-		gpgme_data_release(gpgme_encrypted_data);\
-		gpgme_release(gpgme_ctx);\
-		\
-		plain_text = gpgme_data_release_and_get_mem(gpgme_decrypted_data, &length);\
-	}\
-	/* Reserve one additional byte for the ending 0 byte */\
-	char RESULT[length + 1];\
-	if(memcpy(RESULT, plain_text, length) != RESULT){\
-		fprintf(stderr, "Could not copy decrypted data.\n");\
-		exit(-1);\
-	}\
-	RESULT[length] = 0;\
-	gpgme_free(plain_text);\
-	/* Debug */\
-	printf("DECRYPT_AND_VERIFY end.\n");\
-
 #define DECRYPT_ON_TOKEN(PATH, RESULT) /*Get cipher text from file */\
 	/* Debug */\
 	printf("DECRYPT_ON_TOKEN start.\n");\
@@ -108,14 +63,11 @@
 		exit(-1);\
 	}\
 
-#define DECRYPT_DATA_AND_VERIFY_PATH(PATH_TO_DIRECTORY, PATH_TO_VERIFY, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH_TO_DIRECTORY, FILE_NAME, path_without_file_ending)\
-	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
-	DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)\
-	VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)
-
+/* TODO: Also check signature. Anyhow, in this scenario, the authenticity is not so important anyhow, as we do not trust our system anymore.
+ * But anyhow, we do not need to allow this attack.
+ */
 #define DECRYPT_DATA_ON_TOKEN_AND_VERIFY_PATH(PATH_TO_DIRECTORY, PATH_TO_VERIFY, FILE_NAME, RESULT) LOCAL_STR_CAT(PATH_TO_DIRECTORY, FILE_NAME, path_without_file_ending)\
 	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
-	/*DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)*/\
 	DECRYPT_ON_TOKEN(path_with_file_ending, RESULT)\
 	/* This is no more needed, as the user verified the path. */\
 	/*VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)*/
@@ -142,8 +94,6 @@
 			READ_FILE(path_with_password_file, result)\
 			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
 		} else if(access(path_with_encrypted_password_file, F_OK) == 0){\
-			/*SET_PATH_TO_COMPARE_TO(PATH, path_to_compare_to)*/\
-			/*DECRYPT_DATA_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)*/\
 			DECRYPT_DATA_ON_TOKEN_AND_VERIFY_PATH(PATH, path_to_compare_to, password_file, result)\
 			PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(result, RESULT)\
 		} else {\

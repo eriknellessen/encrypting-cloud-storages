@@ -285,31 +285,6 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	//If there is an encrypted version of the configuration file, decrypt it.
 	//Decrypt data, check signature, check path
 	//Skip this. As we wish to have only one decryption, we do not solve this problem here, but leave this to encfs.
-	/*
-	if(access(encrypted_encfs_file, F_OK) == 0){
-		LOCAL_STR_CAT(ENCFS_CONFIGURATION_FILE, OWN_PUBLIC_KEY_FINGERPRINT, encfs_configuration_file_with_fingerprint)
-		char *path_to_compare_to = NULL;
-		STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_directory, encrypted_directory_name)
-		if(directory_contains_authentic_file(encrypted_directory, DECRYPTED_FOLDER_NAME_FILE_NAME)){
-			path_to_compare_to = encrypted_directory_name;
-		} else {
-			path_to_compare_to = encrypted_directory;
-		}
-		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, path_to_compare_to, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
-		//Write data to file
-		WRITE_STRING_TO_FILE(path_with_encfs_file, encfs_configuration_data)
-		
-		//Debug
-// 		LOCAL_STR_CAT("/bin/bash -c \"cp ", encrypted_directory, cp_cmd_without_file)
-// 		LOCAL_STR_CAT(cp_cmd_without_file, ENCFS_CONFIGURATION_FILE, cp_cmd_without_file_ending)
-// 		LOCAL_STR_CAT(cp_cmd_without_file_ending, "{,.old}", cp_cmd_without_ending_quotation_mark)
-// 		LOCAL_STR_CAT(cp_cmd_without_ending_quotation_mark, "\"", cp_cmd)
-// 		if(system(cp_cmd)){
-// 			fprintf(stderr, "Could not copy encfs configuration file with the following command: %s\n", cp_cmd);
-// 			exit(-1);
-// 		}
-	}
-	*/
 
 	//Get decrypted password
 	GET_PASSWORD(encrypted_directory, password)
@@ -336,42 +311,8 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	printf("Executing the following command: %s\n", concatenated_cmd);
 	popen(concatenated_cmd, "r");
 
-	/*
-	//Debug: Check if encfs changed our configuration file.
-	LOCAL_STR_CAT(path_with_encfs_file, ".old", path_with_old_encfs_file)
-	if(access(path_with_old_encfs_file, F_OK) == 0){
-		//Debug: Because there are problems with encfs on the virtual machine, we do not create the file before and use the second version.
-		//while(get_file_size(path_with_encfs_file) == 0);
-		wait_until_file_is_created_and_has_content(path_with_encfs_file);
-		LOCAL_STR_CAT("/bin/bash -c \"diff -u ", encrypted_directory, diff_cmd_without_file)
-		LOCAL_STR_CAT(diff_cmd_without_file, ENCFS_CONFIGURATION_FILE, diff_cmd_without_file_ending)
-		LOCAL_STR_CAT(diff_cmd_without_file_ending, "{,.old}", diff_cmd_without_ending_quotation_mark)
-		LOCAL_STR_CAT(diff_cmd_without_ending_quotation_mark, "\"", diff_cmd)
-		if(system(diff_cmd)){
-			fprintf(stderr, "Encfs changed the configuration file!\n");
-			exit(-1);
-		}
-	}
-	*/
-
 	//If there is no encrypted version of configuration file, create it.
-	/* TODO: Encfs sometimes does not like our decrypted config files. Not sure what the problem is.
-	 * Maybe this problem only occurs when there are still encfs processes running (noticed this once).
-	 */
 	//Skip this, see above.
-	/*
-	if(access(encrypted_encfs_file, F_OK) != 0){
-		//Wait for encfs to create the file
-		wait_until_file_is_created_and_has_content(path_with_encfs_file);
-		//Read file
-		READ_FILE(path_with_encfs_file, encfs_configuration_data)
-		printf("Read the following encfs configuration data from file: %s\n", encfs_configuration_data);
-		//Prepend path
-		SEPARATE_STRINGS(encrypted_directory, encfs_configuration_data, path_and_encfs_configuration_data)
-		//Encrypt the data and write to file
-		sign_and_encrypt(path_and_encfs_configuration_data, OWN_PUBLIC_KEY_FINGERPRINT, encrypted_directory, ENCFS_CONFIGURATION_FILE);
-	}
-	*/
 
 	free(encrypted_directory);
 	free(mount_point);
@@ -382,8 +323,6 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 
 //encrypted_directory should be full path.
 //Is called for encrypted_directory being a directory containing a DECRYPTED_FOLDER_NAME_FILE_NAME
-//TODO: Not started, when Dropbox creates the folder when we are already running.
-//TODO: The directory is not mounted correctly. It is mounted to DECRYPTED_DIRECTORY, when it should be one directory below.
 void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 	//Debug
 	printf("start_encfs_for_shared_directory started. encrypted_directory: %s\n", encrypted_directory);

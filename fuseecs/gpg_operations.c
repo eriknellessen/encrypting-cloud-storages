@@ -34,7 +34,6 @@ void sign(const char *data, const char *path, const char *file_name){
 		exit(-1);
 	}
 
-	//TODO: Find out, why gpgme gets stuck here. gpg2 works like a charm doing such operations.
 	int r = gpgme_op_sign(gpgme_ctx, gpgme_plaintext_data, gpgme_signed_data, GPGME_SIG_MODE_NORMAL);
 	if(r != GPG_ERR_NO_ERROR){
 		fprintf(stderr, "Could not encrypt and sign plaintext. %s %s\n", gpgme_strsource(r), gpgme_strerror(r));
