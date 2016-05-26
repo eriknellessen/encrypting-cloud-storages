@@ -3,14 +3,17 @@ MOUNTPOINT=
 ENCRYPTED_DIRECTORY_ENCFS=
 DECRYPTED_DIRECTORY_ENCFS=
 
-all:
-	gcc -Wall fusexmp.c gpg_operations.c fuseecs.c `pkg-config fuse --cflags --libs` -lgpgme -pthread -o fuseecs -DHAVE_UTIMENSAT -DHAVE_SETXATTR
+start_foreground: create_mountpoint
+	./fuseecs -f -o allow_other $(MOUNTPOINT)
 
-clean:
-	rm -rf $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
-	rm fuseecs
+start: create_mountpoint
+	./fuseecs -o allow_other $(MOUNTPOINT)
 
-preparations: all create_mountpoint
+stop:
+	fusermount -u $(MOUNTPOINT)
+
+start_encfs: create_mountpoint
+	echo "password" | encfs -f -o allow_other -v -d -s --stdinpass --standard $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
 
 create_mountpoint:
 	mkdir -p $(MOUNTPOINT) $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
@@ -18,14 +21,5 @@ create_mountpoint:
 #	This should not be needed. Dropbox will access the folder with our access rights (via fuse).
 #	chmod 777 $(MOUNTPOINT)
 
-start: preparations
-	./fuseecs -o allow_other $(MOUNTPOINT)
-
-start_foreground: preparations
-	./fuseecs -f -o allow_other $(MOUNTPOINT)
-	
-stop:
-	fusermount -u $(MOUNTPOINT)
-	
-start_encfs: create_mountpoint
-	echo "password" | encfs -f -o allow_other -v -d -s --stdinpass --standard $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)
+clean:
+	rm -rf $(ENCRYPTED_DIRECTORY_ENCFS) $(DECRYPTED_DIRECTORY_ENCFS)

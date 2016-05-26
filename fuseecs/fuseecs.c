@@ -64,7 +64,8 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
  * and https://sourceforge.net/p/fuse/mailman/message/24625009/
  *
  * This problem is on the libfuse TODO list. See https://github.com/libfuse/libfuse/wiki/TODO-List (look
- * for "inotify support"). I asked a question concerning this on the libfuse mailing list.
+ * for "inotify support"). I asked a question concerning this on the libfuse mailing list, see
+ * https://sourceforge.net/p/fuse/mailman/message/34933423/
  */
 
 /* General TODO: From Dropbox's point of view, is it possible to do a path traversal attack? I.e. reading the folder
