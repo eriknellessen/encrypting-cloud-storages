@@ -1,5 +1,6 @@
-1. Create user dropbox
-2. Install dropbox
+1. Create user dropbox: adduser dropbox
+2. Install dropbox (download *.deb from www.dropbox.com)
+2.5 Start dropbox as normal user, so the files are installed. When it asking for your e-mail, close dropbox.
 3. Grant user dropbox write access to your home directory, e.g. by executing chmod 777 ~
 4. Execute xhost + (as normal user)
 5. Start dropbox (as user dropbox)

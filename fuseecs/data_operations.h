@@ -194,3 +194,7 @@ extern const char *Forbidden_file_names[];
 	RESULT[length_of_result - 1] = 0;\
 
 #endif
+
+#define SUBSTITUTE_DECRYPTED_DIRECTORY_WITH_MOUNTPOINT_DIRECTORY(PATH, RESULT) char RESULT[strlen(PATH) - strlen(DECRYPTED_DIRECTORY) + strlen(MOUNTPOINT_DIRECTORY)];\
+	memcpy(RESULT, MOUNTPOINT_DIRECTORY, strlen(MOUNTPOINT_DIRECTORY));\
+	strcpy(RESULT + strlen(MOUNTPOINT_DIRECTORY), PATH + strlen(DECRYPTED_DIRECTORY));

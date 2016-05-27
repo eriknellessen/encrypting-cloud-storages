@@ -4,6 +4,7 @@
 #include <gpgme.h>
 #include <unistd.h>
 #include "data_operations.h"
+#include "show_signer/show_signer_and_get_confirmation.h"
 
 #define ENCRYPT 0
 #define DECRYPT 1
@@ -13,6 +14,7 @@
  */
 #define DECRYPT_AND_VERIFY(PATH, RESULT) char *plain_text;\
 	size_t length;\
+	char *signer_information_string = NULL;\
 	{\
 		gpgme_ctx_t gpgme_ctx;\
 		if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){\
@@ -37,6 +39,32 @@
 		gpgme_release(gpgme_ctx);\
 		\
 		plain_text = gpgme_data_release_and_get_mem(gpgme_decrypted_data, &length);\
+		\
+		/* Get information about the signer */\
+		gpgme_verify_result_t signatures_and_file_name = gpgme_op_verify_result(gpgme_ctx);\
+		gpgme_signature_t signature = signatures_and_file_name->signatures;\
+		if(signature->next != NULL){\
+			fprintf(stderr, "More than one signature, but only one is expected.\n");\
+			exit(-1);\
+		}\
+		gpgme_key_t gpgme_signer_key;\
+		if(gpgme_get_key(gpgme_ctx, signature->fpr, &gpgme_signer_key, 0) != GPG_ERR_NO_ERROR){\
+			fprintf(stderr, "Could not get the signer's key from GPGME.\n");\
+			exit(-1);\
+		}\
+		gpgme_user_id_t signers_user_id = gpgme_signer_key->uids;\
+		while(signers_user_id != NULL){\
+			if(signers_user_id->revoked == 0 && signers_user_id->invalid == 0){\
+				LOCAL_STR_CAT(signer_information_string, "User ID: ", signer_information_string_with_beginning)\
+				LOCAL_STR_CAT(signer_information_string_with_beginning, signers_user_id->uid, signer_information_string_result)\
+				PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(signer_information_string_result, signer_information_string)\
+			}\
+			signers_user_id = signers_user_id->next;\
+			if(signers_user_id != NULL){\
+				LOCAL_STR_CAT(signer_information_string, "\n", signer_information_string_with_newline)\
+				PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(signer_information_string_with_newline, signer_information_string)\
+			}\
+		}\
 	}\
 	/* Reserve one additional byte for the ending 0 byte */\
 	char RESULT[length + 1];\
@@ -45,7 +73,14 @@
 		exit(-1);\
 	}\
 	RESULT[length] = 0;\
-	gpgme_free(plain_text);
+	gpgme_free(plain_text);\
+	SUBSTITUTE_DECRYPTED_DIRECTORY_WITH_MOUNTPOINT_DIRECTORY(PATH, path_to_show_to_user)\
+	LOCAL_STR_CAT(path_to_show_to_user, signer_information_string, path_and_signer_string)\
+	free(signer_information_string);\
+	if(show_signer_and_get_confirmation(path_and_signer_string) != 1){\
+		fprintf(stderr, "Signer could not be confirmed.\n");\
+		exit(-1);\
+	}\
 
 #define VERIFY_PATH(DATA, PATH, RESULT) size_t data_length;\
 	size_t end_of_path;\
