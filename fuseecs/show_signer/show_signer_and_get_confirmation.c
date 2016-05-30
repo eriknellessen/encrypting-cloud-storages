@@ -52,6 +52,7 @@ static void activate(GtkApplication *app, gpointer user_data){
 	gtk_widget_show_all(window);
 }
 
+//TODO: The last shown GTK window is shown (in a destroyed way), until the next one is opened.
 static int build_gtk_app(char *signature_information){
 	GtkApplication *app;
 	int status;

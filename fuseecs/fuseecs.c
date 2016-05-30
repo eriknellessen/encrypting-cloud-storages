@@ -74,6 +74,57 @@ const char *Forbidden_file_names[NUMBER_OF_FORBIDDEN_FILE_NAMES] = {PASSWORD_FIL
 
 enum Access_policy{DROPBOX, /*ENCFS,*/ USER};
 
+void delete_password_file(const char *path){
+	//Delete password file
+	APPEND_SLASH_IF_NECESSARY(path, path_with_slash_at_the_end)
+	LOCAL_STR_CAT(path_with_slash_at_the_end, PASSWORD_FILE_NAME, path_with_password_file)
+
+	if(access(path_with_password_file, F_OK) == 0){
+		if(unlink(path_with_password_file) != 0){
+			fprintf(stderr, "Can't delete password file %s\n", path_with_password_file);
+			exit(-1);
+		}
+	}
+
+	//Recursive call for all folders in this folder
+	struct dirent *m_dirent;
+
+	DIR *m_dir = opendir(path_with_slash_at_the_end);
+	if(m_dir == NULL){
+		fprintf(stderr, "Can't open %s\n", path_with_slash_at_the_end);
+		exit(-1);
+	}
+
+	while((m_dirent = readdir(m_dir)) != NULL){
+		if(strcmp(m_dirent->d_name, ".") && strcmp(m_dirent->d_name, "..") && strcmp(m_dirent->d_name, DROPBOX_INTERNAL_FILES_DIRECTORY)){
+			struct stat stbuf;
+			
+			LOCAL_STR_CAT(path_with_slash_at_the_end, m_dirent->d_name, path_with_file)
+			printf("delete_password_file: examining file %s\n", path_with_file);
+			/* lstat is like stat, but does not try to resolve symbolic links.
+			 * Symbolic links can not be resolved at this point, because they
+			 * are still encrypted. See
+			 * http://pubs.opengroup.org/onlinepubs/009695399/functions/lstat.html
+			 */
+			if(lstat(path_with_file, &stbuf) == -1){
+				fprintf(stderr, "Unable to stat file: %s\n", path_with_file) ;
+				exit(-1);
+			}
+
+			if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
+				printf("delete_password_file: I think, this is a directory!\n");
+				//Directory
+				//Recursive call
+				delete_password_file(path_with_file);
+			}
+		}
+	}
+}
+
+void delete_all_password_files(){
+	delete_password_file(ROOT_DIRECTORY);
+}
+
 void termination_handler(int signum){
 	/* When we call encfs, it forks again and kills the process we created. That is why remembering our spawned
 	 * pids does not help us kill our processes. It is also not possible to get the child processes via pgrep.
@@ -91,6 +142,9 @@ void termination_handler(int signum){
 		//Unmount MOUNT_POINT
 		LOCAL_STR_CAT(FUSERUNMOUNT_COMMAND, MOUNTPOINT_DIRECTORY, fusermount_cmd)
 		system(fusermount_cmd);
+
+		//Delete password files
+		delete_all_password_files();
 
 		exit(0);
 	}
@@ -174,9 +228,12 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	
 	//Folder has been created
 	
+	printf("File: %s, Line: %i\n", __FILE__, __LINE__);
+	
 	//If there is an encrypted version of the configuration file, decrypt it.
 	//Decrypt data, check signature, check path
 	if(access(encrypted_encfs_file, F_OK) == 0){
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
 		LOCAL_STR_CAT(ENCFS_CONFIGURATION_FILE, OWN_PUBLIC_KEY_FINGERPRINT, encfs_configuration_file_with_fingerprint)
 		char *path_to_compare_to = NULL;
 		STRIP_UPPER_DIRECTORIES_AND_ALL_SLASHES(encrypted_directory, encrypted_directory_name)
@@ -185,7 +242,9 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 		} else {
 			path_to_compare_to = encrypted_directory;
 		}
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
 		DECRYPT_DATA_AND_VERIFY_PATH(encrypted_directory, path_to_compare_to, encfs_configuration_file_with_fingerprint, encfs_configuration_data)
+		printf("File: %s, Line: %i\n", __FILE__, __LINE__);
 		//Write data to file
 		WRITE_STRING_TO_FILE(path_with_encfs_file, encfs_configuration_data)
 		

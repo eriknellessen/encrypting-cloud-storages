@@ -76,3 +76,9 @@ int directory_contains_authentic_file(char *encrypted_directory, char *file_name
 		return 0;
 	}
 }
+
+//TODO: Implement this
+int signer_verification_needed(const char *path){
+	//Not needed, if signature with our own private key or we already placed a signed file in the directory, which says, that we already checked the signature
+	return 1;
+}

@@ -20,6 +20,11 @@ if(${MAKEPASSWD} STREQUAL "MAKEPASSWD-NOTFOUND")
 	message(FATAL_ERROR "Could not find makepasswd")
 endif()
 
+find_program(ENCFS encfs)
+if(${ENCFS} STREQUAL "ENCFS-NOTFOUND")
+	message(FATAL_ERROR "Could not find encfs")
+endif()
+
 find_package(Threads REQUIRED)
 
 find_package(GTK3 REQUIRED)
