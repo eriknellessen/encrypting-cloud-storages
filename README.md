@@ -31,16 +31,12 @@ This needs to be done only once. It must be done before starting the transparent
 2. Install Dropbox (download *.deb from www.dropbox.com)
 3. Start Dropbox as normal user, so the files are installed. When it asks for your e-mail, close dropbox.
 4. Grant user Dropbox write access to your home directory, e.g. by executing chmod 777 ~
-5. Execute ```sh
-xhost +
-``` (as normal user)
+5. Execute `xhost +` (as normal user)
 6. Start Dropbox (as user Dropbox)
 7. Choose your home directory when asked where to place the Dropbox directory
 8. Terminate Dropbox
 9. Reclaim your Dropbox directory via chown
-10. Remove all files in Dropbox, e.g. by executing ```sh
-rm -rf ./* ./.*
-``` inside the Dropbox directory
+10. Remove all files in Dropbox, e.g. by executing `rm -rf ./* ./.*` inside the Dropbox directory
 
 ### Starting the transparent client-side encryption
 
