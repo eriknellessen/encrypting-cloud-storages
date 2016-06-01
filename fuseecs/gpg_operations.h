@@ -17,7 +17,6 @@
 	size_t length;\
 	char *signer_information_string = NULL;\
 	{\
-		printf("1\n");\
 		gpgme_ctx_t gpgme_ctx;\
 		if(gpgme_new(&gpgme_ctx) != GPG_ERR_NO_ERROR){\
 			fprintf(stderr, "Could not create gpg context.\n");\
@@ -38,7 +37,6 @@
 			exit(-1);\
 		}\
 		gpgme_data_release(gpgme_encrypted_data);\
-		printf("2\n");\
 		\
 		plain_text = gpgme_data_release_and_get_mem(gpgme_decrypted_data, &length);\
 		\
@@ -55,45 +53,32 @@
 			exit(-1);\
 		}\
 		gpgme_release(gpgme_ctx);\
-		printf("3\n");\
 		gpgme_user_id_t signers_user_id = gpgme_signer_key->uids;\
 		while(signers_user_id != NULL){\
-			printf("4\n");\
 			if(signers_user_id->revoked == 0 && signers_user_id->invalid == 0){\
-				printf("4.1\n");\
 				LOCAL_STR_CAT(signer_information_string == NULL ? "" : signer_information_string, "User ID: ", signer_information_string_with_beginning)\
-				printf("4.1.1\n");\
 				LOCAL_STR_CAT(signer_information_string_with_beginning, signers_user_id->uid, signer_information_string_result)\
-				printf("4.1.2\n");\
 				PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(signer_information_string_result, signer_information_string)\
-				printf("4.1.3\n");\
 			}\
-			printf("4.2\n");\
 			signers_user_id = signers_user_id->next;\
 			if(signers_user_id != NULL){\
-				printf("4.3\n");\
 				LOCAL_STR_CAT(signer_information_string, "\n", signer_information_string_with_newline)\
 				PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(signer_information_string_with_newline, signer_information_string)\
 			}\
-			printf("4.4\n");\
 		}\
-		printf("5\n");\
 	}\
-	printf("6\n");\
 	/* Reserve one additional byte for the ending 0 byte */\
 	char RESULT[length + 1];\
 	if(memcpy(RESULT, plain_text, length) != RESULT){\
 		fprintf(stderr, "Could not copy decrypted data.\n");\
 		exit(-1);\
 	}\
-	printf("7\n");\
 	RESULT[length] = 0;\
 	gpgme_free(plain_text);\
 	SUBSTITUTE_DECRYPTED_DIRECTORY_WITH_MOUNTPOINT_DIRECTORY(PATH, path_to_show_to_user)\
 	LOCAL_STR_CAT(path_to_show_to_user, "\n", path_two_show_to_user_with_linebreak)\
 	LOCAL_STR_CAT(path_two_show_to_user_with_linebreak, signer_information_string, path_and_signer_string)\
 	free(signer_information_string);\
-	printf("8\n");\
 	/* TODO: We can already check, if .encfs and .password file are signed by the same person*/\
 	if(signer_verification_needed(PATH)){\
 		if(show_signer_and_get_confirmation(path_and_signer_string) != 1){\
@@ -122,11 +107,8 @@
 
 #define DECRYPT_DATA_AND_VERIFY_PATH(PATH_TO_DIRECTORY, PATH_TO_VERIFY, FILE_NAME, RESULT) printf("DECRYPT_DATA_AND_VERIFY_PATH START\n");\
 	LOCAL_STR_CAT(PATH_TO_DIRECTORY, FILE_NAME, path_without_file_ending)\
-	printf("1\n");\
 	LOCAL_STR_CAT(path_without_file_ending, ENCRYPTED_FILE_ENDING, path_with_file_ending)\
-	printf("2\n");\
 	DECRYPT_AND_VERIFY(path_with_file_ending, path_and_data)\
-	printf("3\n");\
 	VERIFY_PATH(path_and_data, PATH_TO_VERIFY, RESULT)\
 	printf("DECRYPT_DATA_AND_VERIFY_PATH END\n");\
 
@@ -140,7 +122,6 @@
 
 #define GET_PASSWORD(PATH, RESULT) printf("GET_PASSWORD START\n");\
 	GET_FOLDER_NAME_ITERATIVELY(PATH, DECRYPT, decrypted_path)\
-	printf("GET_PASSWORD MIDDLE\n");\
 	GET_PASSWORD_WITH_KNOWN_DECRYPTED_DIRECTORY(PATH, decrypted_path, RESULT)\
 	printf("GET_PASSWORD END\n");
 
@@ -272,9 +253,7 @@
 
 #define GET_RANDOM_PASSWORD(RESULT) LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
 	RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)\
-	RESULT[PASSWORD_LENGTH] = 0;\
-	/* Debug */\
-	printf("Got the following random password: %s\n", RESULT);
+	RESULT[PASSWORD_LENGTH] = 0;
 
 void sign_and_encrypt(const char *data, const char *public_key_fingerprint, const char *path, const char *file_name);
 int directory_contains_authentic_file(char *encrypted_directory, char *file_name);
