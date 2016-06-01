@@ -27,10 +27,10 @@ make install
 
 This needs to be done only once. It must be done before starting the transparent client-side encryption or Dropbox.
 
-1. Create user Dropbox: adduser Dropbox
-2. Install Dropbox (download *.deb from www.dropbox.com)
+1. Create user Dropbox: `adduser Dropbox`
+2. Install Dropbox (download *.deb from [here](https://www.dropbox.com/))
 3. Start Dropbox as normal user, so the files are installed. When it asks for your e-mail, close dropbox.
-4. Grant user Dropbox write access to your home directory, e.g. by executing chmod 777 ~
+4. Grant user Dropbox write access to your home directory, e.g. by executing `chmod 777 ~`
 5. Execute `xhost +` (as normal user)
 6. Start Dropbox (as user Dropbox)
 7. Choose your home directory when asked where to place the Dropbox directory
