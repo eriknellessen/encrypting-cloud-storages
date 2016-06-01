@@ -21,13 +21,11 @@ int connect_to_card(sc_card_t **card){
 
 	//This would fail, because the OpenPGP card driver in OpenSC expects more output than 0x9000 when
 	//sending select application. So we changed the driver.
-	printf("Card: %p\n", card);
 	r = util_connect_card(ctx, card, NULL, 0, 0);
 	if(r){
 		fprintf(stderr, "failed to connect to card: %s\n", sc_strerror(r));
 		return -1;
 	}
-	printf("Card: %p\n", card);
 	/* check card type */
 	sc_card_t *card_pointer = *card;
 	if((card_pointer->type != SC_CARD_TYPE_OPENPGP_V1) &&
@@ -65,13 +63,6 @@ static gpg_error_t getpin_cb(void *opaque, const void *buffer, size_t length){
 	memcpy(pin, buffer, length);
 	pin_length = length;
 	pin_set = 1;
-	//Debug
-	printf("PIN in getpin_cb: ");
-	int i;
-	for(i = 0; i < length; i++){
-		printf("%c", pin[i]);
-	}
-	printf("\n");
 
 	return 0;
 }
@@ -132,30 +123,14 @@ int decipher(const u8 *cipher_text, int cipher_text_length, u8 **plain_text, sc_
 	int r;
 	int plain_text_length = cipher_text_length;
 
-	/* Debug */
-	{
-	int i;
-		printf("Cipher text before decryption on token: ");
-		for(i = 0; i < cipher_text_length; i++){
-			printf("%02X ", cipher_text[i]);
-		}
-		printf("\n");
-	}
-
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
-	printf("plain_text_length: %i\n", plain_text_length);
 	*plain_text = malloc(plain_text_length + 1);
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	r = sc_decipher(card, cipher_text, cipher_text_length, *plain_text, plain_text_length);
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	if(r < 0 || r > plain_text_length){
 		fprintf(stderr, "Could not decipher: %s\n", sc_strerror(r));
 		return -1;
 	}
 
 	(*plain_text)[r] = 0;
-	//Debug
-	printf("plain_text: %s\n", *plain_text);
 
 	return 0;
 }
@@ -164,34 +139,26 @@ int decipher(const u8 *cipher_text, int cipher_text_length, u8 **plain_text, sc_
 int rsa_decrypt_on_token(const char *cipher_text, int cipher_text_length, char **plain_text){
 	sc_card_t *card;
 
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	//Connect to the card
 	if(connect_to_card(&card) != 0){
 		return -1;
 	}
 	sc_context_t *ctx = card->ctx;
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	//Set security environment
 	if(set_rsa_decryption_security_environment(card) != 0){
 		return -1;
 	}
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	//Verify PIN
 	if(verify_pin(card) != 0){
 		return -1;
 	}
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	//Do the actual deciphering
 	if(decipher((u8 *) cipher_text, cipher_text_length, (u8 **) plain_text, card) != 0){
 		return -1;
 	}
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 
 	sc_unlock(card);
 	sc_disconnect_card(card);
@@ -203,13 +170,11 @@ int rsa_decrypt_on_token(const char *cipher_text, int cipher_text_length, char *
 int send_meta_data_to_token(const char *meta_data, int meta_data_length){
 	sc_card_t *card;
 
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 	//Connect to the card
 	if(connect_to_card(&card) != 0){
 		return -1;
 	}
 	sc_context_t *ctx = card->ctx;
-	printf("File: %s Line: %i\n", __FILE__, __LINE__);
 
 	sc_apdu_t apdu;
 	u8 apdu_case = SC_APDU_CASE_3;

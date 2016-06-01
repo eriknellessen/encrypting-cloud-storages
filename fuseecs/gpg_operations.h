@@ -15,33 +15,11 @@
 	printf("DECRYPT_ON_TOKEN start.\n");\
 	/* File might contain zeros, so we need the length. It is saved in the 'pos' variable. */\
 	READ_FILE(PATH, file_content)\
-	/* Debug */\
-	/*\
-	{\
-	int i;\
-		printf("Data read from file %s : ", PATH);\
-		for(i = 0; i < pos; i++){\
-			printf("%02X ", file_content[i]);\
-		}\
-		printf("\n");\
-	}\
-	*/\
 	\
 	/* We are decrypting a password here. So we need to strip the path, send it to the\
 	* token, then send the cipher text. */\
 	/* Strip the path */\
 	UNSEPARATE_STRINGS(file_content, pos, meta_data, cipher_text, cipher_text_length_including_trailing_zero)\
-	/* Debug */\
-	/*\
-	{\
-	int i;\
-		printf("Cipher text from file %s : ", PATH);\
-		for(i = 0; i < cipher_text_length_including_trailing_zero - 1; i++){\
-			printf("%02X ", cipher_text[i]);\
-		}\
-		printf("\n");\
-	}\
-	*/\
 	/* Decrypt */\
 	if(send_meta_data_to_token(meta_data, strlen(meta_data)) != 0){\
 		fprintf(stderr, "Could not send meta data to token.\n");\
@@ -208,9 +186,7 @@
 
 #define GET_RANDOM_PASSWORD(RESULT) LOCAL_STR_CAT(MAKEPASSWD_COMMAND, PASSWORD_LENGTH_STRING, cmd)\
 	RUN_COMMAND_AND_GET_OUTPUT(cmd, RESULT)\
-	RESULT[PASSWORD_LENGTH] = 0;\
-	/* Debug */\
-	printf("Got the following random password: %s\n", RESULT);
+	RESULT[PASSWORD_LENGTH] = 0;
 
 void sign(const char *data, const char *path, const char *file_name);
 char *verify_signature_and_path(const char *path, const char *path_to_compare_to, const char *file_name);

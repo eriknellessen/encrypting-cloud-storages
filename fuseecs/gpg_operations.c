@@ -111,16 +111,6 @@ void direct_rsa_encrypt_and_save_to_file(const char *plain_text, int plain_text_
 	LOCAL_STR_CAT(path_with_file_name, public_key_fingerprint, path_with_file_name_and_public_key_fingerprint)
 	LOCAL_STR_CAT(path_with_file_name_and_public_key_fingerprint, ENCRYPTED_FILE_ENDING, concatenated_path)
 
-	//Debug
-	/*
-	int i;
-	printf("Data written to file %s : ", concatenated_path);
-	for(i = 0; i < cipher_text_length; i++){
-		printf("%02X ", cipher_text[i]);
-	}
-	printf("\n");
-	*/
-
 	WRITE_BINARY_DATA_TO_FILE(concatenated_path, cipher_text, cipher_text_length)
 
 	free(cipher_text);

@@ -7,7 +7,7 @@ set(CMAKE_INSTALL_PREFIX ${CMAKE_SOURCE_DIR}/build)
 include(FindPythonModule)
 include(GNUInstallDirs)
 
-find_package(Git)
+find_package(Git REQUIRED)
 execute_process (COMMAND ${GIT_EXECUTABLE} submodule init)
 execute_process (COMMAND ${GIT_EXECUTABLE} submodule update)
 
@@ -17,10 +17,18 @@ if(NOT GPGME_FOUND)
 endif()
 find_package(Libgcrypt REQUIRED)
 find_package(fuse REQUIRED)
+if(NOT FUSE_FOUND)
+	message(FATAL_ERROR "Could not find FUSE")
+endif()
 
 find_program(MAKEPASSWD makepasswd)
 if(${MAKEPASSWD} STREQUAL "MAKEPASSWD-NOTFOUND")
 	message(FATAL_ERROR "Could not find makepasswd")
+endif()
+
+find_program(ENCFS encfs)
+if(${ENCFS} STREQUAL "ENCFS-NOTFOUND")
+	message(FATAL_ERROR "Could not find encfs")
 endif()
 
 find_package(Threads REQUIRED)

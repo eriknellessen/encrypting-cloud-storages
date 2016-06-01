@@ -65,8 +65,6 @@ char *get_modulus_and_exponent_from_pgpdump(const char *public_key_string){
 	memcpy(pgpdump_command + + strlen(BEGIN_OF_PGP_DUMP_COMMAND) + strlen(public_key_string) + 1, END_OF_PGPDUMP_COMMAND, strlen(END_OF_PGPDUMP_COMMAND));
 	pgpdump_command [pgpdump_command_length - 1] = 0;
 
-	//printf("pgpdump_command %s\n", pgpdump_command);
-
 	char buffer[BUFFER_SIZE];
 	char *data = NULL;
 	int size;
@@ -168,21 +166,15 @@ gcry_mpi_t get_gcry_mpi_t_from_binary_string(const char *binary_string, int bina
 char *rsa_encrypt(const char *plain_text, int plain_text_length, const char *public_key_fingerprint, size_t *result_length){
 	//Get public key from gpg
 	char *public_key_string = get_public_key_from_gpg(public_key_fingerprint);
-	//Debug
-	//printf("public_key_string: %s\n", public_key_string);
 
 	//Get modulus and exponent from pgpdump
 	char *modulus_and_exponent = get_modulus_and_exponent_from_pgpdump(public_key_string);
 	free(public_key_string);
-	//printf("Modulus and exponent received from pgpdump: %s\n", modulus_and_exponent);
 
 	//Get modulus and exponent as separate strings
 	char *modulus_as_hex_string = copy_until_newline(modulus_and_exponent);
 	char *exponent_as_hex_string = copy_until_newline(modulus_and_exponent + strlen(modulus_as_hex_string) + 1);
 	free(modulus_and_exponent);
-	//Debug
-	//printf("modulus_as_hex_string: %s\n", modulus_as_hex_string);
-	//printf("exponent_as_hex_string: %s\n", exponent_as_hex_string);
 
 	//Convert to binary strings, as needed by libgcrypt
 	//From here on, strings might contain zeros. So we always have to remember the length
@@ -197,9 +189,6 @@ char *rsa_encrypt(const char *plain_text, int plain_text_length, const char *pub
 	gcry_mpi_t modulus = get_gcry_mpi_t_from_binary_string(modulus_as_binary_string, modulus_as_binary_string_length);
 	gcry_mpi_t exponent = get_gcry_mpi_t_from_binary_string(exponent_as_binary_string, exponent_as_binary_string_length);
 	gcry_mpi_t data = get_gcry_mpi_t_from_binary_string(plain_text, plain_text_length);
-	//Debug
-	//gcry_log_debugmpi("modulus", modulus);
-	//gcry_log_debugmpi("exponent", exponent);
 	free(modulus_as_binary_string);
 	free(exponent_as_binary_string);
 
@@ -216,15 +205,11 @@ char *rsa_encrypt(const char *plain_text, int plain_text_length, const char *pub
 	}
 	gcry_mpi_release(modulus);
 	gcry_mpi_release(exponent);
-	//Debug
-	//gcry_log_debugsxp ("s_pkey", s_pkey);
 	rc = gcry_sexp_build(&s_data, NULL, "(data(flags pkcs1)(value %M))", data);
 	if(rc){
 		fprintf(stderr, "File: %s, Line: %i.\n", __FILE__, __LINE__);
 		exit(-1);
 	}
-	//Debug
-	//gcry_log_debugsxp ("s_data", s_data);
 
 	//Do the actual encryption
 	rc = gcry_pk_encrypt(&s_ciph, s_data, s_pkey);
@@ -236,12 +221,8 @@ char *rsa_encrypt(const char *plain_text, int plain_text_length, const char *pub
 	gcry_sexp_release(s_pkey);
 
 	//Get the result
-	//Debug
-	gcry_log_debugsxp("s_ciph", s_ciph);
 	gcry_mpi_t result_as_mpi = get_mpi_from_sexp(s_ciph, "a", GCRYMPI_FMT_USG);
 	gcry_sexp_release(s_ciph);
-	//Debug
-	//gcry_log_debugmpi("result_as_mpi", result_as_mpi);
 	unsigned char *result;
 	rc = gcry_mpi_aprint(GCRYMPI_FMT_USG, &result, result_length, result_as_mpi);
 	if(rc){
@@ -255,20 +236,8 @@ char *rsa_encrypt(const char *plain_text, int plain_text_length, const char *pub
 
 char *compute_hash_value_from_meta_data_lib_function(const char *meta_data, int meta_data_length, int *hash_value_length){
 	*hash_value_length = gcry_md_get_algo_dlen(HASH_ALGORITHM);
-	printf("hash_value_length: %i\n", *hash_value_length);
 	char *hash_value = malloc(*hash_value_length);
 	gcry_md_hash_buffer(HASH_ALGORITHM, hash_value, meta_data, meta_data_length);
-	int i;
-	printf("Meta data: ");
-	for(i = 0; i < meta_data_length; i++){
-		printf("%02X ", meta_data[i]);
-	}
-	printf("\n");
-	printf("Hash value: ");
-	for(i = 0; i < *hash_value_length; i++){
-		printf("%02X ", hash_value[i]);
-	}
-	printf("\n");
 
 	return hash_value;
 }

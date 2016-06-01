@@ -100,7 +100,6 @@ void delete_password_file(const char *path){
 			struct stat stbuf;
 			
 			LOCAL_STR_CAT(path_with_slash_at_the_end, m_dirent->d_name, path_with_file)
-			printf("delete_password_file: examining file %s\n", path_with_file);
 			/* lstat is like stat, but does not try to resolve symbolic links.
 			 * Symbolic links can not be resolved at this point, because they
 			 * are still encrypted. See
@@ -112,7 +111,6 @@ void delete_password_file(const char *path){
 			}
 
 			if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
-				printf("delete_password_file: I think, this is a directory!\n");
 				//Directory
 				//Recursive call
 				delete_password_file(path_with_file);
@@ -186,7 +184,6 @@ void create_encfs_directory(const char *encrypted_directory){
 
 	//Create random password and encrypt it
 	GET_RANDOM_PASSWORD(password)
-	printf("password before encryption: %s\n", password);
 	//We need to also sign the path. Otherwise, the storage provider could
 	//put the same password file in all folders and we would only use one password for everything.
 	/*
@@ -228,13 +225,6 @@ void create_encfs_directory(const char *encrypted_directory){
 			READ_FILE(concatenated_path, cipher_text)
 			//pos contains length of read cipher_text, (see macro READ_FILE)
 			cipher_text_length = pos;
-			//Debug
-			int i;
-			printf("Data read to file %s : ", concatenated_path);
-			for(i = 0; i < cipher_text_length; i++){
-				printf("%02X ", cipher_text[i]);
-			}
-			printf("\n");
 			//SEPARATE_STRINGS does not work here, as the cipher text might contain zeros.
 			//SEPARATE_STRINGS(decrypted_directory, cipher_text, meta_data_and_cipher_text_local)
 			meta_data_and_cipher_text = malloc(strlen(meta_data) + 1 + cipher_text_length);
@@ -242,13 +232,6 @@ void create_encfs_directory(const char *encrypted_directory){
 			meta_data_and_cipher_text[strlen(meta_data)] = PATH_SEPARATOR;
 			memcpy(meta_data_and_cipher_text + strlen(meta_data) + 1, cipher_text, cipher_text_length);
 		}
-		//Debug
-		int i;
-		printf("Data going to be written to file %s : ", concatenated_path);
-		for(i = 0; i < strlen(meta_data) + 1 + cipher_text_length; i++){
-			printf("%02X ", meta_data_and_cipher_text[i]);
-		}
-		printf("\n");
 		WRITE_BINARY_DATA_TO_FILE(concatenated_path, meta_data_and_cipher_text, strlen(meta_data) + 1 + cipher_text_length)
 		free(meta_data_and_cipher_text);
 	/*} else {
@@ -288,7 +271,6 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 
 	//Get decrypted password
 	GET_PASSWORD(encrypted_directory, password)
-	printf("password after decryption: %s\n", password);
 
 	//Start encfs process
 	/* We do not want Dropbox to be able to read our password file. Using chmod 600 is not enough, because
@@ -307,8 +289,6 @@ void start_encfs(const char *encrypted_directory_maybe_without_slash, const char
 	LOCAL_STR_CAT(cmd_with_password_file_and_quotas, encrypted_directory, cmd_with_encrypted_directory)
 	LOCAL_STR_CAT(cmd_with_encrypted_directory, " ", cmd_with_encrypted_directory_and_space)
 	LOCAL_STR_CAT(cmd_with_encrypted_directory_and_space, mount_point, concatenated_cmd)
-	printf("before popen.\n");
-	printf("Executing the following command: %s\n", concatenated_cmd);
 	popen(concatenated_cmd, "r");
 
 	//If there is no encrypted version of configuration file, create it.
@@ -346,44 +326,31 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 		free(encrypted_folder_name);
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_folder_name_local, decrypted_folder_name)
 	}
-	//Debug
-	printf("Step 1 completed. decrypted_folder_name: %s\n", decrypted_folder_name);
 
-	printf("Step 2.1\n");
 	//Get decrypted folder name
 	//Strip last folder in path
 	//Get the decrypted path
 	//Append the decrypted folder name
 	REMOVE_LAST_FOLDER(encrypted_directory, path_without_last_folder)
-	printf("Step 2.2\n");
 	char *decrypted_path_without_last_folder = NULL;
 	{
 		APPEND_SLASH_IF_NECESSARY(path_without_last_folder, path_without_last_folder_ending_on_slash)
 		GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(path_without_last_folder_ending_on_slash, decrypted_path_without_last_folder_local)
 		PROPAGATE_LOCAL_STR_TO_OUTER_VARIABLE(decrypted_path_without_last_folder_local, decrypted_path_without_last_folder)
 	}
-	printf("Step 2.3\n");
 	LOCAL_STR_CAT(decrypted_path_without_last_folder, decrypted_folder_name, decrypted_path)
 	free(decrypted_path_without_last_folder);
 	free(decrypted_folder_name);
-	//Debug
-	printf("decrypted path: %s\n", decrypted_path);
 	if(access(decrypted_path, F_OK) != 0){
 		if(xmp_mkdir(decrypted_path, mode)){
 			fprintf(stderr, "Could not create dir: %s\n", decrypted_path);
 			exit(-1);
 		}
 	}
-	//Debug
-	printf("Step 2 completed. decrypted_path: %s\n", decrypted_path);
 
 	GET_ENCRYPTED_FOLDER_NAME_ITERATIVELY(decrypted_path, encrypted_path)
-	//Debug
-	printf("Step 3.1. encrypted_path: %s\n", encrypted_path);
 	//Wait for encfs to create the folder
 	wait_until_file_is_created_and_has_content(encrypted_path);
-	//Debug
-	printf("Step 3 completed. encrypted_path: %s\n", encrypted_path);
 
 	/* TODO: After signing, the reader will be in exclusive mode, because gpg locks it.
 	 * See for example: https://lists.gnupg.org/pipermail/gnupg-devel/2015-August/030246.html
@@ -399,12 +366,8 @@ void start_encfs_for_shared_directory(char *encrypted_directory, mode_t mode){
 		printf("PLEASE PROVIDE THE READER IN 'NOT EXCLUSIVE' MODE AND PRESS ENTER!\n");
 		getchar();
 	}
-	//Debug
-	printf("Step 4 completed.\n");
 
 	start_encfs(encrypted_directory, decrypted_path);
-	//Debug
-	printf("Step 5 completed.\n");
 	//Debug
 	printf("start_encfs_for_shared_directory ended. encrypted_directory: %s\n", encrypted_directory);
 }
@@ -423,21 +386,13 @@ void start_encfs_for_directory(char *encrypted_directory_maybe_without_slash){
 		start_encfs_for_shared_directory(encrypted_directory, 0744);
 		return;
 	}
-	//Debug
-	printf("start_encfs_for_directory: encrypted_directory %s is not a shared folder.\n", encrypted_directory);
 	
 	//Start encfs for the correct folder.
 	//Get correct directory name
 	if(strcmp(encrypted_directory, ROOT_DIRECTORY) == 0){
-		//Debug
-		printf("Calling start_encfs from start_encfs_for_directory.\n");
-		
 		start_encfs(encrypted_directory, DECRYPTED_DIRECTORY);
 	} else {
-	 	GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_folder_name)
-		//Debug
-		printf("Calling start_encfs from start_encfs_for_directory.\n");
-		
+		GET_DECRYPTED_FOLDER_NAME_ITERATIVELY(encrypted_directory, decrypted_folder_name)
 		start_encfs(encrypted_directory, decrypted_folder_name);
 	}
 
@@ -458,7 +413,6 @@ void start_encfs_for_directory(char *encrypted_directory_maybe_without_slash){
 			struct stat stbuf;
 			APPEND_SLASH_IF_NECESSARY(encrypted_directory, path)
 			LOCAL_STR_CAT(path, m_dirent->d_name, path_with_file)
-			printf("start_encfs_for_directory: examining file %s\n", path_with_file);
 			/* lstat is like stat, but does not try to resolve symbolic links.
 			 * Symbolic links can not be resolved at this point, because they
 			 * are still encrypted. See
@@ -470,7 +424,6 @@ void start_encfs_for_directory(char *encrypted_directory_maybe_without_slash){
 			}
 
 			if((stbuf.st_mode & S_IFMT ) == S_IFDIR){
-				printf("start_encfs_for_directory: I think, this is a directory!\n");
 				//Directory
 				//Recursive call
 				start_encfs_for_directory(path_with_file);
@@ -637,7 +590,6 @@ static int ecs_mkdir(const char *path, mode_t mode)
 			//Not needed, just for compiler
 			pthread_t thread;
 
-			printf("Will wait for Dropbox.\n");
 			pthread_create(&thread, NULL, wait_for_dropbox_in_another_thread_and_start_encfs_for_shared_directory, not_const_path);
 		}
 	} else {
@@ -655,9 +607,7 @@ static int ecs_mkdir(const char *path, mode_t mode)
 			path = path + sizeof(char) * 1;
 		}
 		LOCAL_STR_CAT(DECRYPTED_DIRECTORY, path, full_decrypted_path)
-		//Debug
-		printf("Calling start_encfs from ecs_mkdir.\n");
-		
+
 		start_encfs(path_to_new_encrypted_folder, full_decrypted_path);
 	}
 
