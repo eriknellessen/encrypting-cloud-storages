@@ -44,6 +44,7 @@ find_library(OPENSC opensc)
 if(${OPENSC} STREQUAL "OPENSC-NOTFOUND")
 	message(FATAL_ERROR "Could not find libopensc")
 endif()
+message("PLEASE NOTICE, THAT OPENSC MUST BE VERSION 0.16.0~rc2-1.")
 
 find_program(AUTOCONF autoconf)
 if(${AUTOCONF} STREQUAL "AUTOCONF-NOTFOUND")
