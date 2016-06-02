@@ -71,37 +71,25 @@ int xmp_readlink(const char *path, char *buf, size_t size)
 int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 		       off_t offset, struct fuse_file_info *fi)
 {
-	printf("%s %d\n", __FILE__, __LINE__);
 	DIR *dp;
 	struct dirent *de;
 
 	(void) offset;
 	(void) fi;
 
-	printf("%s %d\n", __FILE__, __LINE__);
-	
 	dp = opendir(path);
-	printf("%s %d\n", __FILE__, __LINE__);
 	if (dp == NULL)
 		return -errno;
-	printf("%s %d\n", __FILE__, __LINE__);
-	printf("%s %d\n", __FILE__, __LINE__);
-	printf("%s %d\n", __FILE__, __LINE__);
 	while ((de = readdir(dp)) != NULL) {
-		printf("%s %d\n", __FILE__, __LINE__);
 		struct stat st;
 		memset(&st, 0, sizeof(st));
 		st.st_ino = de->d_ino;
 		st.st_mode = de->d_type << 12;
-		printf("%s %d\n", __FILE__, __LINE__);
 		if (filler(buf, de->d_name, &st, 0))
 			break;
-		printf("%s %d\n", __FILE__, __LINE__);
 	}
-	printf("%s %d\n", __FILE__, __LINE__);
 
 	closedir(dp);
-	printf("%s %d\n", __FILE__, __LINE__);
 	return 0;
 }
 
