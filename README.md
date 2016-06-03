@@ -2,6 +2,8 @@
 
 This software enables you to transparently encrypt your Dropbox folder on your PC. It also supports sharing files with other Dropbox users, while still encrypting the shared data.
 
+![Alt text](ecs-setup.png?raw=true "Overview of the involved components")
+
 Warning: This is just proof-of-concept code and should _NOT_ be used in production environments
 
 # Tested platforms:

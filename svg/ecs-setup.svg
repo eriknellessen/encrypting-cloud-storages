@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink= "http://www.w3.org/1999/xlink">
+	<defs>
+		<marker id="Triangle"
+			viewBox="0 0 10 10" 
+			refX="1" refY="5"
+			markerWidth="6" 
+			markerHeight="6"
+			orient="auto">
+			<path d="M 0 0 L 10 5 L 0 10 z" />
+		</marker>
+	</defs>
+
+	<image x="0" y="0" width="80" height="80" xlink:href="androgynous_person.svg" />
+	<text x="30" y="90" style="font-size:10px">User</text>
+	<circle cx="200" cy="50" r="30" stroke="black" stroke-width="2" fill="none" />
+	<text x="177" y="46" style="font-size:10px">Dropbox
+		<tspan x="177" y="61">directory</tspan>
+	</text>
+	<line x1="73" y1="50" x2="159" y2="50" style="stroke:rgb(0,0,0);stroke-width:2" marker-end="url(#Triangle)" />
+	<text x="90" y="40" style="font-size:10px">places file in</text>
+	<rect x="325" y="35" width="60" height="30" stroke="black" stroke-width="2" fill="none"></rect>
+	<text x="335" y="53" style="font-size:10px">Fuseecs</text>
+	<line x1="230" y1="50" x2="314" y2="50" style="stroke:rgb(0,0,0);stroke-width:2" marker-end="url(#Triangle)" />
+	<text x="250" y="40" style="font-size:10px">triggers</text>
+	<rect x="480" y="27" width="60" height="45" stroke="black" stroke-width="2" fill="none"></rect>
+	<text x="488" y="45" style="font-size:10px">Dropbox
+		<tspan x="488" y="60">program</tspan>
+	</text>
+	<line x1="385" y1="50" x2="469" y2="50" style="stroke:rgb(0,0,0);stroke-width:2" marker-end="url(#Triangle)" />
+	<text x="395" y="25" style="font-size:10px">provides cipher
+		<tspan x="395" y="40">texts</tspan>
+	</text>
+	<image x="630" y="0" width="80" height="80" xlink:href="storage_array.svg" />
+	<text x="630" y="90" style="font-size:10px">Dropbox storage
+		<tspan x="630" y="105">server</tspan>
+	</text>
+	<line x1="542" y1="50" x2="646" y2="50" style="stroke:rgb(0,0,0);stroke-width:2" stroke-dasharray="3, 5" marker-end="url(#Triangle)" />
+	<text x="552" y="40" style="font-size:10px">transfers data</text>
+</svg>
