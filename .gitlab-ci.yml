@@ -10,6 +10,13 @@
 
 image: gcc
 
+stages:
+  - build
+  - test
+
+include:
+  - template: Code-Quality.gitlab-ci.yml
+
 build:
   stage: build
   # instead of calling g++ directly you can also use some build toolkit like make
@@ -35,3 +42,12 @@ build:
 #  stage: test
 #  script:
 #    - ./runmytests.sh
+
+code_quality:
+  before_script:
+    - ''
+  stage: test
+  variables:
+    REPORT_FORMAT: html
+  artifacts:
+    paths: [gl-code-quality-report.html]
