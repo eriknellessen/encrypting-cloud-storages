@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.0.2)
 add_subdirectory(direct_asymmetric_decryption_on_token)
 add_subdirectory(direct_asymmetric_encryption)
 
+add_subdirectory(test)
+
 execute_process(COMMAND ./configuration.sh ${CMAKE_INSTALL_FULL_BINDIR} ${CMAKE_INSTALL_FULL_LIBDIR} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_library(fuseecsl SHARED fusexmp.c gpg_operations.c)

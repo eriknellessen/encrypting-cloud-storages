@@ -66,5 +66,11 @@ if(${ASSUAN_INCLUDE_DIR} STREQUAL "ASSUAN_INCLUDE_DIR-NOTFOUND")
 	message(FATAL_ERROR "Could not find libassuan header files")
 endif()
 
+find_package(Criterion REQUIRED)
+if(NOT CRITERION_FOUND)
+	message(FATAL_ERROR "Could not find criterion")
+endif()
+
+enable_testing()
 add_subdirectory(fuseecs)
 add_subdirectory(share_a_folder)
