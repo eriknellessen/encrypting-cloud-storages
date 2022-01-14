@@ -32,5 +32,11 @@ if(NOT GTK3_FOUND)
 	message(FATAL_ERROR "Could not find GTK3")
 endif()
 
+find_package(Criterion REQUIRED)
+if(NOT CRITERION_FOUND)
+	message(FATAL_ERROR "Could not find criterion")
+endif()
+
+enable_testing()
 add_subdirectory(fuseecs)
 add_subdirectory(share_a_folder)
