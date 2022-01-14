@@ -72,5 +72,7 @@ if(NOT CRITERION_FOUND)
 endif()
 
 enable_testing()
+add_compile_options(--coverage)
+add_link_options(--coverage)
 add_subdirectory(fuseecs)
 add_subdirectory(share_a_folder)
