@@ -17,13 +17,12 @@ stages:
 include:
   - template: Code-Quality.gitlab-ci.yml
 
+before_script:
+     - apt update && apt -y install cmake libgpgme-dev libgcrypt-dev libfuse-dev makepasswd encfs python3-pgpdump opensc-pkcs11 libc6-dev pcscd automake libpcsclite-dev libgtk-3-dev libcriterion-dev
+     - ln -s /usr/lib/x86_64-linux-gnu/libopensc.so.7.0.0 /usr/lib/x86_64-linux-gnu/libopensc.so
+
 build:
   stage: build
-  # instead of calling g++ directly you can also use some build toolkit like make
-  # install the necessary build tools when needed
-  before_script:
-     - apt update && apt -y install cmake libgpgme-dev libgcrypt-dev libfuse-dev makepasswd encfs python3-pgpdump opensc-pkcs11 libc6-dev pcscd automake libpcsclite-dev libgtk-3-dev
-     - ln -s /usr/lib/x86_64-linux-gnu/libopensc.so.7.0.0 /usr/lib/x86_64-linux-gnu/libopensc.so
   script:
     - cd build
     - cmake ..
@@ -31,17 +30,23 @@ build:
 
   artifacts:
     paths:
-      # - mybinary
-      # depending on your build setup it's most likely a good idea to cache outputs to reduce the build time
-      # cache:
-      #   paths:
-      #     - "*.o"
+      - build/bin
+  # depending on your build setup it's most likely a good idea to cache outputs to reduce the build time
+  cache:
+    key: build-cache
+    paths:
+      - build/
 
 # run tests using the binary built before
-#test:
-#  stage: test
-#  script:
-#    - ./runmytests.sh
+test:
+  stage: test
+  script:
+    - cd build
+    - make test
+  cache:
+    key: build-cache
+    paths:
+      - build/
 
 code_quality:
   before_script:
