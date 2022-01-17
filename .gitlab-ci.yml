@@ -42,7 +42,7 @@ test:
   stage: test
   script:
     - cd build
-    - make test
+    - CTEST_OUTPUT_ON_FAILURE=1 make test
     - gcovr --exclude-unreachable-branches --exclude .*_test\.c --html-details -o coverage.html --root ${CI_PROJECT_DIR}
     - gcovr --xml-pretty --exclude-unreachable-branches --exclude .*_test\.c --print-summary -o coverage.xml --root ${CI_PROJECT_DIR}
   coverage: /^\s*lines:\s*\d+.\d+\%/
