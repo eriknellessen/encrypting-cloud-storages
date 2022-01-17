@@ -18,7 +18,7 @@ include:
   - template: Code-Quality.gitlab-ci.yml
 
 before_script:
-     - apt update && apt -y install cmake libgpgme-dev libgcrypt-dev libfuse-dev makepasswd encfs python3-pgpdump opensc-pkcs11 libc6-dev pcscd automake libpcsclite-dev libgtk-3-dev libcriterion-dev gcovr
+     - apt update && apt -y install cmake libgpgme-dev libgcrypt-dev libfuse-dev makepasswd encfs python3-pgpdump opensc-pkcs11 libc6-dev pcscd automake libpcsclite-dev libgtk-3-dev libcmocka-dev gcovr
      - ln -s /usr/lib/x86_64-linux-gnu/libopensc.so.7.0.0 /usr/lib/x86_64-linux-gnu/libopensc.so
 
 build:
