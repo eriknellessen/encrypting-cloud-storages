@@ -32,9 +32,9 @@ if(NOT GTK3_FOUND)
 	message(FATAL_ERROR "Could not find GTK3")
 endif()
 
-find_package(Criterion REQUIRED)
-if(NOT CRITERION_FOUND)
-	message(FATAL_ERROR "Could not find criterion")
+find_package(CMocka REQUIRED)
+if(NOT CMOCKA_FOUND)
+	message(FATAL_ERROR "Could not find cmocka")
 endif()
 
 enable_testing()
