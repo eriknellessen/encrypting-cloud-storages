@@ -15,7 +15,7 @@ http://sar.informatik.hu-berlin.de/research/publications/SAR-PR-2016-01/SAR-PR-2
 
 # Building
 
-[![Build Status](https://gitlab.com/eriknellessen/encrypting-cloud-storages/badges/user-controlled-decryption-operations/pipeline.svg)](https://gitlab.com/eriknellessen/encrypting-cloud-storages/-/pipelines?ref=user-controlled-decryption-operations) [![Code Coverage](https://gitlab.com/eriknellessen/encrypting-cloud-storages/badges/user-controlled-decryption-operations/coverage.svg)](https://gitlab.com/eriknellessen/encrypting-cloud-storages/-/pipelines?ref=user-controlled-decryption-operations)
+[![Build Status](https://gitlab.com/eriknellessen/encrypting-cloud-storages/badges/user-controlled-decryption-operations/pipeline.svg)](https://gitlab.com/eriknellessen/encrypting-cloud-storages/-/pipelines?ref=user-controlled-decryption-operations) [![Code Coverage](https://gitlab.com/eriknellessen/encrypting-cloud-storages/badges/user-controlled-decryption-operations/coverage.svg)](https://gitlab.com/eriknellessen/encrypting-cloud-storages/-/pipelines?ref=user-controlled-decryption-operations) [![Code Quality](https://img.shields.io/badge/code%20quality-download%20report-blue)](https://gitlab.com/api/v4/projects/15583766/jobs/artifacts/user-controlled-decryption-operations/download?job=code_quality)
 
 To build the software, execute the following commands:
 
