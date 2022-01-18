@@ -51,7 +51,7 @@ test:
     reports:
       cobertura: build/coverage.xml
     paths: 
-      - build/coverage.html
+      - build/coverage*.html
   cache:
     key: build-cache
     paths:
