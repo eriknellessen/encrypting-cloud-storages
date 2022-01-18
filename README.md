@@ -15,6 +15,8 @@ http://sar.informatik.hu-berlin.de/research/publications/SAR-PR-2016-01/SAR-PR-2
 
 # Building
 
+[![Build Status](https://gitlab.com/eriknellessen/encrypting-cloud-storages/badges/master/pipeline.svg)](https://gitlab.com/eriknellessen/encrypting-cloud-storages/-/pipelines?ref=master) [![Code Coverage](https://gitlab.com/eriknellessen/encrypting-cloud-storages/badges/master/coverage.svg)](https://gitlab.com/eriknellessen/encrypting-cloud-storages/-/pipelines?ref=master)
+
 To build the software, execute the following commands:
 
 ```sh
