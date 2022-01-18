@@ -10,6 +10,6 @@ set_target_properties(gpg_operations_test
         PROPERTIES
         LINK_FLAGS  "-g -Wl,--wrap=access"
 )
-target_link_libraries(gpg_operations_test cmocka ${GPGME_VANILLA_LIBRARIES} showSigner)
+target_link_libraries(gpg_operations_test cmocka ${GPGME_VANILLA_LIBRARIES} directRsaEncryption)
 
 add_test(NAME gpg_operations_test WORKING_DIRECTORY fuseecs/test COMMAND ./gpg_operations_test)

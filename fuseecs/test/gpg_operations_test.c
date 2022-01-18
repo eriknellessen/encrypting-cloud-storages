@@ -15,7 +15,7 @@ int __wrap_access(const char *pathname, int how) {
 }
 
 static void test_directory_contains_authentic_file(void **state) {
-    expect_string(__wrap_access, pathname, "/foo/bar.txt0102030405060708090A0B0C0D0E0F1011121314.gpg");
+    expect_string(__wrap_access, pathname, "/foo/bar.txt.gpg");
     will_return(__wrap_access, 1);
     
     char *encrypted_directory = "/foo/";
