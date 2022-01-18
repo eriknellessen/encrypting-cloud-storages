@@ -1,9 +1,17 @@
-#include <string.h>
-#include <criterion/criterion.h>
-#include <criterion/new/assert.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
 #include "../data_operations.h"
 
-Test(data_operations_test_suite, local_string_concatenation_test) {
+static void test_local_string_concatenation(void **state) {
     LOCAL_STR_CAT("foo", "bar", concatenated_string)
-    cr_assert(eq(str, concatenated_string, "foobar"), "Did not concatenate strings as expected!");
+    assert_string_equal(concatenated_string, "foobar");
+}
+
+int main(void) {
+    const struct CMUnitTest tests[] = {
+        cmocka_unit_test(test_local_string_concatenation),
+    };
+    return cmocka_run_group_tests(tests, NULL, NULL);
 }
