@@ -37,8 +37,10 @@ sed -i '/#define ACCESS_USER_ID /c\#define ACCESS_USER_ID '`echo $UID` configura
 sed -i '/#define MOUNTPOINT_DIRECTORY \"\"/c\#define MOUNTPOINT_DIRECTORY \"'$MOUNTPOINT'\"' configuration.h
 sed -i '/#define ROOT_DIRECTORY \"\"/c\#define ROOT_DIRECTORY \"'$ENCRYPTED_DIRECTORY'\"' configuration.h
 sed -i '/#define DECRYPTED_DIRECTORY \"\"/c\#define DECRYPTED_DIRECTORY \"'$DECRYPTED_DIRECTORY'\"' configuration.h
-printf "Listing keys:\n"
-gpg2 --list-secret-keys
-read -p "Please copy and paste your key's fingerprint: " GPG_KEY_FINGERPRINT
+if [[ -z "${GPG_KEY_FINGERPRINT}" ]]; then
+  printf "Listing keys:\n"
+  gpg2 --list-secret-keys
+  read -p "Please copy and paste your key's fingerprint: " GPG_KEY_FINGERPRINT
+fi
 sed -i '/#define OWN_PUBLIC_KEY_FINGERPRINT \"\"/c\#define OWN_PUBLIC_KEY_FINGERPRINT \"'$GPG_KEY_FINGERPRINT'\"' configuration.h
 printf "Configuring configuration.h done.\n"

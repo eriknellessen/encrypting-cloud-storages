@@ -25,7 +25,7 @@ build:
   stage: build
   script:
     - cd build
-    - cmake ..
+    - GPG_KEY_FINGERPRINT=0102030405060708090A0B0C0D0E0F1011121314 cmake ..
     - make install
 
   artifacts:
@@ -51,7 +51,7 @@ test:
     reports:
       cobertura: build/coverage.xml
     paths: 
-      - build/coverage.html
+      - build/coverage*.html
   cache:
     key: build-cache
     paths:
